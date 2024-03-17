@@ -1,0 +1,6 @@
+libs
+output
+models
+data
+__pycache__
+*txt
