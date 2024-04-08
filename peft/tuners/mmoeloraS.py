@@ -12,6 +12,7 @@ from transformers.pytorch_utils import Conv1D
 
 from ..utils import _get_submodules, transpose, PeftType
 
+
 def is_bnb_available():
     return importlib.util.find_spec("bitsandbytes") is not None
 
@@ -21,6 +22,7 @@ class MMOELoraConfigS(LoraConfig):
     """
     This is the configuration class to store the configuration of a [`~peft.MMOELora`]
     """
+
     task_num: int = field(default=2, metadata={"help": "The number of tasks."})
     task_embedding_dim: int = field(default=64)
     expert_num: int = field(default=4)
@@ -29,14 +31,9 @@ class MMOELoraConfigS(LoraConfig):
         self.peft_type = PeftType.MMOELORAS
 
 
-
 class MMOELoraModelS(MMOELoraModel):
-
     def __init__(self, model, config, adapter_name):
-
         super().__init__(model, config, adapter_name)
-
-
 
     def _find_and_replace(self, adapter_name):
         """Replace the target `Linear` module with LoRA layer (Linear+LoRA)"""
@@ -58,13 +55,18 @@ class MMOELoraModelS(MMOELoraModel):
             "task_embedding_dim": lora_config.task_embedding_dim,
             "expert_num": lora_config.expert_num,
         }
-        key_list = [key for key, _ in self.model.named_modules()]   # all module in raw model
+        key_list = [
+            key for key, _ in self.model.named_modules()
+        ]  # all module in raw model
         for key in key_list:
             # find the corresponding modules. target module has been split into list.
             if isinstance(lora_config.target_modules, str):
                 target_module_found = re.fullmatch(lora_config.target_modules, key)
             else:
-                target_module_found = any(key.endswith(target_key) for target_key in lora_config.target_modules)
+                target_module_found = any(
+                    key.endswith(target_key)
+                    for target_key in lora_config.target_modules
+                )
             if target_module_found:
                 if not is_target_modules_in_base_model:
                     is_target_modules_in_base_model = True
@@ -83,30 +85,40 @@ class MMOELoraModelS(MMOELoraModel):
                         raise NotImplementedError
                     else:
                         if isinstance(target, torch.nn.Linear):
-                            in_features, out_features = target.in_features, target.out_features
+                            in_features, out_features = (
+                                target.in_features,
+                                target.out_features,
+                            )
                             if kwargs["fan_in_fan_out"]:
                                 warnings.warn(
                                     "fan_in_fan_out is set to True but the target module is `torch.nn.Linear`. "
                                     "Setting fan_in_fan_out to False."
                                 )
-                                kwargs["fan_in_fan_out"] = lora_config.fan_in_fan_out = False
+                                kwargs[
+                                    "fan_in_fan_out"
+                                ] = lora_config.fan_in_fan_out = False
                         elif isinstance(target, Conv1D):
                             in_features, out_features = (
-                                target.weight.ds_shape if hasattr(target.weight, "ds_shape") else target.weight.shape
+                                target.weight.ds_shape
+                                if hasattr(target.weight, "ds_shape")
+                                else target.weight.shape
                             )
                             if not kwargs["fan_in_fan_out"]:
                                 warnings.warn(
                                     "fan_in_fan_out is set to False but the target module is `Conv1D`. "
                                     "Setting fan_in_fan_out to True."
                                 )
-                                kwargs["fan_in_fan_out"] = lora_config.fan_in_fan_out = True
+                                kwargs[
+                                    "fan_in_fan_out"
+                                ] = lora_config.fan_in_fan_out = True
                         else:
                             raise ValueError(
                                 f"Target module {target} is not supported. "
                                 f"Currently, only `torch.nn.Linear` and `Conv1D` are supported."
                             )
-                        new_module = MMOELoraLinearS(adapter_name, in_features, out_features, 
-                                                    bias=bias, **kwargs)
+                        new_module = MMOELoraLinearS(
+                            adapter_name, in_features, out_features, bias=bias, **kwargs
+                        )
 
                     self._replace_module(parent, target_name, new_module, target)
         if not is_target_modules_in_base_model:
@@ -116,21 +128,28 @@ class MMOELoraModelS(MMOELoraModel):
             )
 
 
-
 class MMOELoraLinearS(MMOELoraLinear):
-
-    def __init__(self, 
-                 adapter_name: str, 
-                 in_features: int, 
-                 out_features: int, 
-                 r: int = 0, 
-                 lora_alpha: int = 1, 
-                 lora_dropout: float = 0, 
-                 fan_in_fan_out: bool = False, 
-                 **kwargs):
-        
-        super().__init__(adapter_name, in_features, out_features, r, lora_alpha, lora_dropout, fan_in_fan_out, **kwargs)
-
+    def __init__(
+        self,
+        adapter_name: str,
+        in_features: int,
+        out_features: int,
+        r: int = 0,
+        lora_alpha: int = 1,
+        lora_dropout: float = 0,
+        fan_in_fan_out: bool = False,
+        **kwargs,
+    ):
+        super().__init__(
+            adapter_name,
+            in_features,
+            out_features,
+            r,
+            lora_alpha,
+            lora_dropout,
+            fan_in_fan_out,
+            **kwargs,
+        )
 
     def unmerge(self, expert_weight):
         if self.active_adapter not in self.lora_A.keys():
@@ -152,34 +171,48 @@ class MMOELoraLinearS(MMOELoraLinear):
                 )
             self.merged = False
 
-
     def forward(self, x: torch.Tensor, **kwargs):
         expert_weight = kwargs["task_id"]
         previous_dtype = x.dtype
 
-        if self.active_adapter not in self.lora_A.keys():   # No adapter, directly use linear
-            return F.linear(x, transpose(self.weight, self.fan_in_fan_out), bias=self.bias)
-        if self.disable_adapters:   # No adapter
-            if self.r[self.active_adapter] > 0 and self.merged: # merge the adapter to linear
+        if (
+            self.active_adapter not in self.lora_A.keys()
+        ):  # No adapter, directly use linear
+            return F.linear(
+                x, transpose(self.weight, self.fan_in_fan_out), bias=self.bias
+            )
+        if self.disable_adapters:  # No adapter
+            if (
+                self.r[self.active_adapter] > 0 and self.merged
+            ):  # merge the adapter to linear
                 self.unmerge(expert_weight)
-            result = F.linear(x, transpose(self.weight, self.fan_in_fan_out), bias=self.bias)
-        elif self.r[self.active_adapter] > 0 and not self.merged:   # general lora process
-            result = F.linear(x, transpose(self.weight, self.fan_in_fan_out), bias=self.bias)
+            result = F.linear(
+                x, transpose(self.weight, self.fan_in_fan_out), bias=self.bias
+            )
+        elif (
+            self.r[self.active_adapter] > 0 and not self.merged
+        ):  # general lora process
+            result = F.linear(
+                x, transpose(self.weight, self.fan_in_fan_out), bias=self.bias
+            )
 
             x = x.to(self.lora_A[self.active_adapter].loraA[0].weight.dtype)
 
             for i in range(self.expert_num):
-                result += ( # lora process
+                result += (  # lora process
                     self.lora_B[self.active_adapter].loraB[i](
-                        self.lora_A[self.active_adapter].loraA[i](self.lora_dropout[self.active_adapter](x)),
+                        self.lora_A[self.active_adapter].loraA[i](
+                            self.lora_dropout[self.active_adapter](x)
+                        ),
                     )
                     * self.scaling[self.active_adapter]
                     * expert_weight[..., i].unsqueeze(-1).unsqueeze(0)
                 )
         else:
-            result = F.linear(x, transpose(self.weight, self.fan_in_fan_out), bias=self.bias)
+            result = F.linear(
+                x, transpose(self.weight, self.fan_in_fan_out), bias=self.bias
+            )
 
         result = result.to(previous_dtype)
 
         return result
-

@@ -21,19 +21,36 @@ import torch
 # needed for prefix-tuning of bloom model
 def bloom_model_postprocess_past_key_value(past_key_values):
     past_key_values = torch.cat(past_key_values)
-    total_layers, batch_size, num_attention_heads, num_virtual_tokens, head_dim = past_key_values.shape
+    (
+        total_layers,
+        batch_size,
+        num_attention_heads,
+        num_virtual_tokens,
+        head_dim,
+    ) = past_key_values.shape
     keys = past_key_values[: total_layers // 2]
     keys = keys.transpose(2, 3).reshape(
-        total_layers // 2, batch_size * num_attention_heads, head_dim, num_virtual_tokens
+        total_layers // 2,
+        batch_size * num_attention_heads,
+        head_dim,
+        num_virtual_tokens,
     )
     values = past_key_values[total_layers // 2 :]
-    values = values.reshape(total_layers // 2, batch_size * num_attention_heads, num_virtual_tokens, head_dim)
+    values = values.reshape(
+        total_layers // 2,
+        batch_size * num_attention_heads,
+        num_virtual_tokens,
+        head_dim,
+    )
 
     return tuple(zip(keys, values))
 
 
 def prepare_model_for_int8_training(
-    model, output_embedding_layer_name="lm_head", use_gradient_checkpointing=True, layer_norm_names=["layer_norm"]
+    model,
+    output_embedding_layer_name="lm_head",
+    use_gradient_checkpointing=True,
+    layer_norm_names=["layer_norm"],
 ):
     r"""
     This method wraps the entire protocol for preparing a model before running a training. This includes:
@@ -52,7 +69,9 @@ def prepare_model_for_int8_training(
 
         if loaded_in_8bit:
             # cast layer norm in fp32 for stability for 8bit models
-            if param.ndim == 1 and any(layer_norm_name in name for layer_norm_name in layer_norm_names):
+            if param.ndim == 1 and any(
+                layer_norm_name in name for layer_norm_name in layer_norm_names
+            ):
                 param.data = param.data.to(torch.float32)
 
     if loaded_in_8bit and use_gradient_checkpointing:
@@ -83,13 +102,19 @@ def prepare_model_for_int8_training(
             def forward(self, x):
                 return super().forward(x.to(input_dtype)).to(torch.float32)
 
-        setattr(model, output_embedding_layer_name, CastOutputToFloat(output_embedding_layer))
+        setattr(
+            model,
+            output_embedding_layer_name,
+            CastOutputToFloat(output_embedding_layer),
+        )
 
     return model
 
 
 # copied from transformers.models.bart.modeling_bart
-def shift_tokens_right(input_ids: torch.Tensor, pad_token_id: int, decoder_start_token_id: int):
+def shift_tokens_right(
+    input_ids: torch.Tensor, pad_token_id: int, decoder_start_token_id: int
+):
     """
     Shift input ids one token to the right.
 
@@ -119,7 +144,9 @@ class ModulesToSaveWrapper(torch.nn.Module):
         self.active_adapter = adapter_name
 
     def update(self, adapter_name):
-        self.modules_to_save.update(torch.nn.ModuleDict({adapter_name: copy.deepcopy(self.original_module)}))
+        self.modules_to_save.update(
+            torch.nn.ModuleDict({adapter_name: copy.deepcopy(self.original_module)})
+        )
 
     def forward(self, *args, **kwargs):
         if self.active_adapter not in self.modules_to_save:
@@ -143,7 +170,9 @@ def _freeze_adapter(model, adapter_name):
 def _set_trainable(model, adapter_name):
     key_list = [key for key, _ in model.named_modules()]
     for key in key_list:
-        target_module_found = any(key.endswith(target_key) for target_key in model.modules_to_save)
+        target_module_found = any(
+            key.endswith(target_key) for target_key in model.modules_to_save
+        )
         if target_module_found:
             parent, target, target_name = _get_submodules(model, key)
             if isinstance(target, ModulesToSaveWrapper):
@@ -165,7 +194,11 @@ def fsdp_auto_wrap_policy(model):
     import os
 
     from accelerate import FullyShardedDataParallelPlugin
-    from torch.distributed.fsdp.wrap import _or_policy, lambda_auto_wrap_policy, transformer_auto_wrap_policy
+    from torch.distributed.fsdp.wrap import (
+        _or_policy,
+        lambda_auto_wrap_policy,
+        transformer_auto_wrap_policy,
+    )
 
     from ..tuners import PrefixEncoder, PromptEmbedding, PromptEncoder
 
@@ -178,7 +211,9 @@ def fsdp_auto_wrap_policy(model):
             return True
         return False
 
-    lambda_policy = functools.partial(lambda_auto_wrap_policy, lambda_fn=lambda_policy_fn)
+    lambda_policy = functools.partial(
+        lambda_auto_wrap_policy, lambda_fn=lambda_policy_fn
+    )
     transformer_wrap_policy = functools.partial(
         transformer_auto_wrap_policy,
         transformer_layer_cls=(
@@ -191,7 +226,9 @@ def fsdp_auto_wrap_policy(model):
         ),
     )
 
-    auto_wrap_policy = functools.partial(_or_policy, policies=[lambda_policy, transformer_wrap_policy])
+    auto_wrap_policy = functools.partial(
+        _or_policy, policies=[lambda_policy, transformer_wrap_policy]
+    )
     return auto_wrap_policy
 
 
@@ -240,8 +277,9 @@ TRANSFORMERS_MODELS_TO_ADALORA_TARGET_MODULES_MAPPING = {
     # "layoutlm": ["query", "value"],
 }
 
-# TODO layer mapping
-TRANSFORMERS_MODELS_TO_MMOELORAS_TARGET_MODULES_MAPPING = TRANSFORMERS_MODELS_TO_LORA_TARGET_MODULES_MAPPING
+TRANSFORMERS_MODELS_TO_MMOELORAS_TARGET_MODULES_MAPPING = (
+    TRANSFORMERS_MODELS_TO_LORA_TARGET_MODULES_MAPPING
+)
 TRANSFORMERS_MODELS_TO_EVELORA_TARGET_MODULES_MAPPING = {
     "mixtral": ["block_sparse_moe"],
 }

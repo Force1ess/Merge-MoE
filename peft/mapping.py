@@ -20,7 +20,6 @@ from .peft_model import (
     PeftModelForSequenceClassification,
     PeftModelForTokenClassification,
     PeftModelForCausalLMShared,
-    PeftModelForCausalLMSharedM,
 )
 from .tuners import (
     AdaLoraConfig,
@@ -30,7 +29,7 @@ from .tuners import (
     PromptEncoderConfig,
     PromptTuningConfig,
     MMOELoraConfigS,
-    EVELoraConfig
+    EVELoraConfig,
 )
 from .utils import PromptLearningConfig
 
@@ -51,7 +50,7 @@ PEFT_TYPE_TO_CONFIG_MAPPING = {
     "LORA": LoraConfig,
     "ADALORA": AdaLoraConfig,
     "MMOELORAS": MMOELoraConfigS,
-    "EVELORA":EVELoraConfig
+    "EVELORA": EVELoraConfig,
 }
 
 
@@ -116,10 +115,13 @@ def get_peft_model(model, peft_config):
         model ([`transformers.PreTrainedModel`]): Model to be wrapped.
         peft_config ([`PeftConfig`]): Configuration object containing the parameters of the Peft model.
     """
-    model_config = model.config.to_dict() if hasattr(model.config, "to_dict") else model.config
+    model_config = (
+        model.config.to_dict() if hasattr(model.config, "to_dict") else model.config
+    )
     peft_config.base_model_name_or_path = model.__dict__.get("name_or_path", None)
-    if peft_config.task_type not in MODEL_TYPE_TO_PEFT_MODEL_MAPPING.keys() and not isinstance(
-        peft_config, PromptLearningConfig
+    if (
+        peft_config.task_type not in MODEL_TYPE_TO_PEFT_MODEL_MAPPING.keys()
+        and not isinstance(peft_config, PromptLearningConfig)
     ):
         return PeftModel(model, peft_config)
     if isinstance(peft_config, PromptLearningConfig):

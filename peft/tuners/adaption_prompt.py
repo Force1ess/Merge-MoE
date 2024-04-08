@@ -22,8 +22,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.ft_chatglm_lora.peft.utils.config import PeftConfig, PeftType
-from src.ft_chatglm_lora.peft.utils.other import _freeze_adapter, _get_submodules
+from peft.utils.config import PeftConfig, PeftType
+from peft.utils.other import _freeze_adapter, _get_submodules
 
 
 def llama_rotate_half(x: torch.Tensor) -> torch.Tensor:
@@ -69,8 +69,16 @@ def llama_compute_query_states(model: nn.Module, **kwargs) -> torch.Tensor:
     position_ids = kwargs.get("position_ids")
     past_key_value = kwargs.get("past_key_value")
     bsz, q_len, _ = hidden_states.size()
-    query_states = model.q_proj(hidden_states).view(bsz, q_len, model.num_heads, model.head_dim).transpose(1, 2)
-    value_states = model.v_proj(hidden_states).view(bsz, q_len, model.num_heads, model.head_dim).transpose(1, 2)
+    query_states = (
+        model.q_proj(hidden_states)
+        .view(bsz, q_len, model.num_heads, model.head_dim)
+        .transpose(1, 2)
+    )
+    value_states = (
+        model.v_proj(hidden_states)
+        .view(bsz, q_len, model.num_heads, model.head_dim)
+        .transpose(1, 2)
+    )
 
     seq_len = q_len
     if past_key_value is not None:
@@ -82,7 +90,14 @@ def llama_compute_query_states(model: nn.Module, **kwargs) -> torch.Tensor:
 
 # Contains the config that is specific to a transformers model type.
 ModelTypeConfig = namedtuple(
-    "ModelTypeConfig", ["compute_query_states", "target_modules", "k_proj_layer", "v_proj_layer", "o_proj_layer"]
+    "ModelTypeConfig",
+    [
+        "compute_query_states",
+        "target_modules",
+        "k_proj_layer",
+        "v_proj_layer",
+        "o_proj_layer",
+    ],
 )
 # Mapping of transformers model types to their specific configuration.
 TRANSFORMERS_MODEL_CONFIG = {
@@ -106,10 +121,17 @@ class AdaptionPromptConfig(PeftConfig):
     """Stores the configuration of an [`AdaptionPromptModel`]."""
 
     target_modules: str = field(
-        default=None, metadata={"help": "Name of the attention submodules to insert adaption prompts into."}
+        default=None,
+        metadata={
+            "help": "Name of the attention submodules to insert adaption prompts into."
+        },
     )
-    adapter_len: int = field(default=None, metadata={"help": "Number of adapter tokens to insert"})
-    adapter_layers: int = field(default=None, metadata={"help": "Number of adapter layers (from the top)"})
+    adapter_len: int = field(
+        default=None, metadata={"help": "Number of adapter tokens to insert"}
+    )
+    adapter_layers: int = field(
+        default=None, metadata={"help": "Number of adapter layers (from the top)"}
+    )
 
     def __post_init__(self):
         self.peft_type = PeftType.ADAPTION_PROMPT
@@ -121,7 +143,9 @@ def prepare_config(
 ) -> AdaptionPromptConfig:
     """Prepare the config based on the llama model type."""
     if model.config.model_type not in TRANSFORMERS_MODEL_CONFIG:
-        raise ValueError("Unsupported model type for adaption prompt: '{model.config.model_type}'.")
+        raise ValueError(
+            "Unsupported model type for adaption prompt: '{model.config.model_type}'."
+        )
 
     model_config = TRANSFORMERS_MODEL_CONFIG[model.config.model_type]
 
@@ -225,7 +249,9 @@ class AdaptionPromptModel(nn.Module):
         self._enabled = False
         self._remove_adapted_attentions(self._active_adapter)
 
-    def _create_adapted_attentions(self, config: AdaptionPromptConfig, parents: List[nn.Module]) -> None:
+    def _create_adapted_attentions(
+        self, config: AdaptionPromptConfig, parents: List[nn.Module]
+    ) -> None:
         """Wrap LlamaAttention modules with newly created AdaptedAttention modules."""
         for par in parents:
             attn = AdaptedAttention(
@@ -321,7 +347,9 @@ class AdaptedAttention(nn.Module):
         o_proj_layer = TRANSFORMERS_MODEL_CONFIG[self.model_type].o_proj_layer
 
         if k_proj_layer == v_proj_layer:
-            _, key, value = getattr(self.model, k_proj_layer)(self.adaption_prompt).split(embed_dim, dim=2)
+            _, key, value = getattr(self.model, k_proj_layer)(
+                self.adaption_prompt
+            ).split(embed_dim, dim=2)
         else:
             key = getattr(self.model, k_proj_layer)(self.adaption_prompt)
             value = getattr(self.model, v_proj_layer)(self.adaption_prompt)
@@ -339,17 +367,25 @@ class AdaptedAttention(nn.Module):
         )
 
         # Recompute query states.
-        compute_query_states = TRANSFORMERS_MODEL_CONFIG[self.model_type].compute_query_states
+        compute_query_states = TRANSFORMERS_MODEL_CONFIG[
+            self.model_type
+        ].compute_query_states
         # (bsz, num_heads, q_len, head_dim)
         query_states = compute_query_states(model=self.model, **kwargs)
 
         # (bsz, num_heads, q_len, adapter_len)
-        scores = torch.matmul(query_states, adapter_k.transpose(2, 3)) / math.sqrt(self.model.head_dim)
+        scores = torch.matmul(query_states, adapter_k.transpose(2, 3)) / math.sqrt(
+            self.model.head_dim
+        )
         # Upcast attention to fp32
         # (bsz, num_heads, q_len, adapter_len)
-        scores = self.adaption_gate * F.softmax(scores, dim=-1, dtype=torch.float32).to(query_states.dtype)
+        scores = self.adaption_gate * F.softmax(scores, dim=-1, dtype=torch.float32).to(
+            query_states.dtype
+        )
         # (bsz, q_len, num_heads * head_dim)
-        adapter_output = torch.matmul(scores, adapter_v).transpose(1, 2).reshape(bsz, q_len, -1)
+        adapter_output = (
+            torch.matmul(scores, adapter_v).transpose(1, 2).reshape(bsz, q_len, -1)
+        )
         # (bsz, q_len, hidden_size)
         if o_proj_layer is not None:
             adapter_output = getattr(self.model, o_proj_layer)(adapter_output)

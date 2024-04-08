@@ -54,12 +54,20 @@ class AdaLoraConfig(LoraConfig):
     init_r: int = field(default=12, metadata={"help": "Intial Lora matrix dimension."})
     tinit: int = field(default=0, metadata={"help": "The steps of initial warmup."})
     tfinal: int = field(default=0, metadata={"help": "The steps of final warmup."})
-    deltaT: int = field(default=1, metadata={"help": "Step interval of rank allocation."})
+    deltaT: int = field(
+        default=1, metadata={"help": "Step interval of rank allocation."}
+    )
     beta1: float = field(default=0.85, metadata={"help": "Hyperparameter of EMA."})
     beta2: float = field(default=0.85, metadata={"help": "Hyperparameter of EMA."})
-    orth_reg_weight: float = field(default=0.5, metadata={"help": "The orthogonal regularization coefficient."})
-    total_step: Optional[int] = field(default=None, metadata={"help": "The total training steps."})
-    rank_pattern: Optional[dict] = field(default=None, metadata={"help": "The saved rank pattern."})
+    orth_reg_weight: float = field(
+        default=0.5, metadata={"help": "The orthogonal regularization coefficient."}
+    )
+    total_step: Optional[int] = field(
+        default=None, metadata={"help": "The total training steps."}
+    )
+    rank_pattern: Optional[dict] = field(
+        default=None, metadata={"help": "The saved rank pattern."}
+    )
 
     def __post_init__(self):
         self.peft_type = PeftType.ADALORA
@@ -99,7 +107,11 @@ class AdaLoraModel(LoraModel):
 
     def add_adapter(self, adapter_name, config=None):
         if config is not None:
-            model_config = self.model.config.to_dict() if hasattr(self.model.config, "to_dict") else self.model.config
+            model_config = (
+                self.model.config.to_dict()
+                if hasattr(self.model.config, "to_dict")
+                else self.model.config
+            )
             config = self._prepare_adalora_config(config, model_config)
             self.peft_config[adapter_name] = config
         self._find_and_replace(adapter_name)
@@ -123,7 +135,9 @@ class AdaLoraModel(LoraModel):
             _freeze_adapter(self.model, adapter_name)
         else:
             self.trainable_adapter_name = adapter_name
-            self.rankallocator = RankAllocator(self.model, self.peft_config[adapter_name], self.trainable_adapter_name)
+            self.rankallocator = RankAllocator(
+                self.model, self.peft_config[adapter_name], self.trainable_adapter_name
+            )
 
     def _find_and_replace(self, adapter_name):
         lora_config = self.peft_config[adapter_name]
@@ -146,7 +160,10 @@ class AdaLoraModel(LoraModel):
             if isinstance(lora_config.target_modules, str):
                 target_module_found = re.fullmatch(lora_config.target_modules, key)
             else:
-                target_module_found = any(key.endswith(target_key) for target_key in lora_config.target_modules)
+                target_module_found = any(
+                    key.endswith(target_key)
+                    for target_key in lora_config.target_modules
+                )
             if target_module_found:
                 if not is_target_modules_in_base_model:
                     is_target_modules_in_base_model = True
@@ -171,33 +188,48 @@ class AdaLoraModel(LoraModel):
                             }
                         )
                         new_module = SVDLinear8bitLt(
-                            adapter_name, target.in_features, target.out_features, bias=bias, **kwargs
+                            adapter_name,
+                            target.in_features,
+                            target.out_features,
+                            bias=bias,
+                            **kwargs,
                         )
                     else:
                         if isinstance(target, torch.nn.Linear):
-                            in_features, out_features = target.in_features, target.out_features
+                            in_features, out_features = (
+                                target.in_features,
+                                target.out_features,
+                            )
                             if kwargs["fan_in_fan_out"]:
                                 warnings.warn(
                                     "fan_in_fan_out is set to True but the target module is `torch.nn.Linear`. "
                                     "Setting fan_in_fan_out to False."
                                 )
-                                kwargs["fan_in_fan_out"] = lora_config.fan_in_fan_out = False
+                                kwargs[
+                                    "fan_in_fan_out"
+                                ] = lora_config.fan_in_fan_out = False
                         elif isinstance(target, Conv1D):
                             in_features, out_features = (
-                                target.weight.ds_shape if hasattr(target.weight, "ds_shape") else target.weight.shape
+                                target.weight.ds_shape
+                                if hasattr(target.weight, "ds_shape")
+                                else target.weight.shape
                             )
                             if not kwargs["fan_in_fan_out"]:
                                 warnings.warn(
                                     "fan_in_fan_out is set to False but the target module is `Conv1D`. "
                                     "Setting fan_in_fan_out to True."
                                 )
-                                kwargs["fan_in_fan_out"] = lora_config.fan_in_fan_out = True
+                                kwargs[
+                                    "fan_in_fan_out"
+                                ] = lora_config.fan_in_fan_out = True
                         else:
                             raise ValueError(
                                 f"Target module {target} is not supported. "
                                 f"Currently, only `torch.nn.Linear` and `Conv1D` are supported."
                             )
-                        new_module = SVDLinear(adapter_name, in_features, out_features, bias=bias, **kwargs)
+                        new_module = SVDLinear(
+                            adapter_name, in_features, out_features, bias=bias, **kwargs
+                        )
 
                     self._replace_module(parent, target_name, new_module, target)
         if not is_target_modules_in_base_model:
@@ -224,7 +256,9 @@ class AdaLoraModel(LoraModel):
             regu_loss = 0
             num_param = 0
             for n, p in self.model.named_parameters():
-                if ("lora_A" in n or "lora_B" in n) and self.trainable_adapter_name in n:
+                if (
+                    "lora_A" in n or "lora_B" in n
+                ) and self.trainable_adapter_name in n:
                     para_cov = p @ p.T if "lora_A" in n else p.T @ p
                     I = torch.eye(*para_cov.size(), out=torch.empty_like(para_cov))
                     I.requires_grad = False
@@ -244,7 +278,11 @@ class AdaLoraModel(LoraModel):
                 rank = rank_idx.sum().item()
             else:
                 raise ValueError("Unexcepted type of rank_idx")
-            key = ".".join(name.split(".")[0:-2]) if adapter_name in name else ".".join(name.split(".")[0:-1])
+            key = (
+                ".".join(name.split(".")[0:-2])
+                if adapter_name in name
+                else ".".join(name.split(".")[0:-1])
+            )
             _, target, _ = _get_submodules(self.model, key)
             lora_E_weights = target.lora_E[adapter_name][rank_idx]
             lora_A_weights = target.lora_A[adapter_name][rank_idx]
@@ -268,16 +306,24 @@ class AdaLoraModel(LoraModel):
     def resize_state_dict_by_rank_pattern(self, rank_pattern, state_dict, adapter_name):
         for name, rank_idx in rank_pattern.items():
             rank = sum(rank_idx)
-            prefix = ".".join(name.split(".")[0:-2]) if adapter_name in name else ".".join(name.split(".")[0:-1])
+            prefix = (
+                ".".join(name.split(".")[0:-2])
+                if adapter_name in name
+                else ".".join(name.split(".")[0:-1])
+            )
             for layer in ["lora_E", "lora_A", "lora_B"]:
                 key = f"base_model.model.{prefix}.{layer}.{adapter_name}"
                 if layer != "lora_B":
                     state_dict[key] = (
-                        state_dict[key][rank_idx] if rank != state_dict[key].shape[0] else state_dict[key]
+                        state_dict[key][rank_idx]
+                        if rank != state_dict[key].shape[0]
+                        else state_dict[key]
                     )
                 else:
                     state_dict[key] = (
-                        state_dict[key][:, rank_idx] if rank != state_dict[key].shape[1] else state_dict[key]
+                        state_dict[key][:, rank_idx]
+                        if rank != state_dict[key].shape[1]
+                        else state_dict[key]
                     )
         return state_dict
 
@@ -285,12 +331,16 @@ class AdaLoraModel(LoraModel):
         lora_config = self.peft_config[self.trainable_adapter_name]
         # Update the importance score and allocate the budget
         if global_step < lora_config.total_step - lora_config.tfinal:
-            _, rank_pattern = self.rankallocator.update_and_allocate(self.model, global_step)
+            _, rank_pattern = self.rankallocator.update_and_allocate(
+                self.model, global_step
+            )
             if rank_pattern:
                 lora_config.rank_pattern = rank_pattern
         # Finalize the budget allocation
         elif global_step == lora_config.total_step - lora_config.tfinal:
-            _, rank_pattern = self.rankallocator.update_and_allocate(self.model, global_step, force_mask=True)
+            _, rank_pattern = self.rankallocator.update_and_allocate(
+                self.model, global_step, force_mask=True
+            )
             # for some reason, this freezes the trainable parameters and nothing gets updates
             # self.resize_modules_by_rank_pattern(rank_pattern, self.trainable_adapter_name)
             lora_config.rank_pattern = rank_pattern
@@ -298,7 +348,9 @@ class AdaLoraModel(LoraModel):
         # Currently using inefficient way to mask the unimportant weights using the rank pattern
         #  due to problem mentioned above
         elif global_step > lora_config.total_step - lora_config.tfinal:
-            self.rankallocator.mask_using_rank_pattern(self.model, lora_config.rank_pattern)
+            self.rankallocator.mask_using_rank_pattern(
+                self.model, lora_config.rank_pattern
+            )
         # Pass the function and do forward propagation
         else:
             return None
@@ -306,11 +358,16 @@ class AdaLoraModel(LoraModel):
     @staticmethod
     def _prepare_adalora_config(peft_config, model_config):
         if peft_config.target_modules is None:
-            if model_config["model_type"] not in TRANSFORMERS_MODELS_TO_ADALORA_TARGET_MODULES_MAPPING:
-                raise ValueError("Please specify `target_modules` in `peft_config`")
-            peft_config.target_modules = TRANSFORMERS_MODELS_TO_ADALORA_TARGET_MODULES_MAPPING[
+            if (
                 model_config["model_type"]
-            ]
+                not in TRANSFORMERS_MODELS_TO_ADALORA_TARGET_MODULES_MAPPING
+            ):
+                raise ValueError("Please specify `target_modules` in `peft_config`")
+            peft_config.target_modules = (
+                TRANSFORMERS_MODELS_TO_ADALORA_TARGET_MODULES_MAPPING[
+                    model_config["model_type"]
+                ]
+            )
         if peft_config.inference_mode:
             peft_config.merge_weights = True
         return peft_config
@@ -328,7 +385,9 @@ class AdaLoraLayer(LoraLayer):
         self.lora_B = nn.ParameterDict({})
         self.ranknum = nn.ParameterDict({})
 
-    def update_layer(self, adapter_name, r, lora_alpha, lora_dropout, init_lora_weights):
+    def update_layer(
+        self, adapter_name, r, lora_alpha, lora_dropout, init_lora_weights
+    ):
         self.r[adapter_name] = r
         self.lora_alpha[adapter_name] = lora_alpha
         if lora_dropout > 0.0:
@@ -341,13 +400,27 @@ class AdaLoraLayer(LoraLayer):
         self.lora_dropout.update(nn.ModuleDict({adapter_name: lora_dropout_layer}))
         # Actual trainable parameters
         # Right singular vectors
-        self.lora_A.update(nn.ParameterDict({adapter_name: nn.Parameter(torch.zeros(r, self.in_features))}))
+        self.lora_A.update(
+            nn.ParameterDict(
+                {adapter_name: nn.Parameter(torch.zeros(r, self.in_features))}
+            )
+        )
         # Singular values
-        self.lora_E.update(nn.ParameterDict({adapter_name: nn.Parameter(torch.zeros(r, 1))}))
+        self.lora_E.update(
+            nn.ParameterDict({adapter_name: nn.Parameter(torch.zeros(r, 1))})
+        )
         # Left singular vectors
-        self.lora_B.update(nn.ParameterDict({adapter_name: nn.Parameter(torch.zeros(self.out_features, r))}))
+        self.lora_B.update(
+            nn.ParameterDict(
+                {adapter_name: nn.Parameter(torch.zeros(self.out_features, r))}
+            )
+        )
         # The current rank
-        self.ranknum.update(nn.ParameterDict({adapter_name: nn.Parameter(torch.zeros(1), requires_grad=False)}))
+        self.ranknum.update(
+            nn.ParameterDict(
+                {adapter_name: nn.Parameter(torch.zeros(1), requires_grad=False)}
+            )
+        )
         self.ranknum[adapter_name].data.fill_(float(r))
         self.ranknum[adapter_name].requires_grad = False
         self.scaling[adapter_name] = lora_alpha if lora_alpha > 0 else float(r)
@@ -399,7 +472,10 @@ class SVDLinear(nn.Linear, AdaLoraLayer):
             self.weight.data += (
                 transpose(
                     self.lora_B[self.active_adapter]
-                    @ (self.lora_A[self.active_adapter] * self.lora_E[self.active_adapter])
+                    @ (
+                        self.lora_A[self.active_adapter]
+                        * self.lora_E[self.active_adapter]
+                    )
                 )
                 * self.scaling[self.active_adapter]
                 / (self.ranknum[self.active_adapter] + 1e-5)
@@ -416,7 +492,10 @@ class SVDLinear(nn.Linear, AdaLoraLayer):
             self.weight.data -= (
                 transpose(
                     self.lora_B[self.active_adapter]
-                    @ (self.lora_A[self.active_adapter] * self.lora_E[self.active_adapter])
+                    @ (
+                        self.lora_A[self.active_adapter]
+                        * self.lora_E[self.active_adapter]
+                    )
                 )
                 * self.scaling[self.active_adapter]
                 / (self.ranknum[self.active_adapter] + 1e-5)
@@ -425,24 +504,35 @@ class SVDLinear(nn.Linear, AdaLoraLayer):
 
     def forward(self, x: torch.Tensor):
         if self.active_adapter not in self.lora_A.keys():
-            return F.linear(x, transpose(self.weight, self.fan_in_fan_out), bias=self.bias)
+            return F.linear(
+                x, transpose(self.weight, self.fan_in_fan_out), bias=self.bias
+            )
         if self.disable_adapters:
             if self.r[self.active_adapter] > 0 and self.merged:
                 self.unmerge()
-            result = F.linear(x, transpose(self.weight, self.fan_in_fan_out), bias=self.bias)
+            result = F.linear(
+                x, transpose(self.weight, self.fan_in_fan_out), bias=self.bias
+            )
         elif self.r[self.active_adapter] > 0 and not self.merged:
-            result = F.linear(x, transpose(self.weight, self.fan_in_fan_out), bias=self.bias)
+            result = F.linear(
+                x, transpose(self.weight, self.fan_in_fan_out), bias=self.bias
+            )
             result += (
                 (
                     self.lora_dropout[self.active_adapter](x)
-                    @ (self.lora_A[self.active_adapter] * self.lora_E[self.active_adapter]).T
+                    @ (
+                        self.lora_A[self.active_adapter]
+                        * self.lora_E[self.active_adapter]
+                    ).T
                     @ self.lora_B[self.active_adapter].T
                 )
                 * self.scaling[self.active_adapter]
                 / (self.ranknum[self.active_adapter] + 1e-5)
             )
         else:
-            result = F.linear(x, transpose(self.weight, self.fan_in_fan_out), bias=self.bias)
+            result = F.linear(
+                x, transpose(self.weight, self.fan_in_fan_out), bias=self.bias
+            )
         return result
 
 
@@ -466,16 +556,22 @@ if is_bnb_available():
                 out_features,
                 bias=kwargs.get("bias", True),
                 has_fp16_weights=kwargs.get("has_fp16_weights", True),
-                memory_efficient_backward=kwargs.get("memory_efficient_backward", False),
+                memory_efficient_backward=kwargs.get(
+                    "memory_efficient_backward", False
+                ),
                 threshold=kwargs.get("threshold", 0.0),
                 index=kwargs.get("index", None),
             )
-            AdaLoraLayer.__init__(self, in_features=in_features, out_features=out_features)
+            AdaLoraLayer.__init__(
+                self, in_features=in_features, out_features=out_features
+            )
             # Freezing the pre-trained weight matrix
             self.weight.requires_grad = False
 
             init_lora_weights = kwargs.pop("init_lora_weights", True)
-            self.update_layer(adapter_name, r, lora_alpha, lora_dropout, init_lora_weights)
+            self.update_layer(
+                adapter_name, r, lora_alpha, lora_dropout, init_lora_weights
+            )
             self.active_adapter = adapter_name
 
         def forward(self, x: torch.Tensor):
@@ -492,7 +588,10 @@ if is_bnb_available():
                     output = (
                         (
                             self.lora_dropout[self.active_adapter](x)
-                            @ (self.lora_A[self.active_adapter] * self.lora_E[self.active_adapter]).T
+                            @ (
+                                self.lora_A[self.active_adapter]
+                                * self.lora_E[self.active_adapter]
+                            ).T
                             @ self.lora_B[self.active_adapter].T
                         ).to(expected_dtype)
                         * self.scaling[self.active_adapter]
@@ -502,7 +601,10 @@ if is_bnb_available():
                     output = (
                         (
                             self.lora_dropout[self.active_adapter](x)
-                            @ (self.lora_A[self.active_adapter] * self.lora_E[self.active_adapter]).T
+                            @ (
+                                self.lora_A[self.active_adapter]
+                                * self.lora_E[self.active_adapter]
+                            ).T
                             @ self.lora_B[self.active_adapter].T
                         )
                         * self.scaling[self.active_adapter]
@@ -567,7 +669,9 @@ class RankAllocator(object):
         else:
             # Budget decreasing with a cubic scheduler
             mul_coeff = 1 - (step - tinit) / (total_step - tfinal - tinit)
-            budget = int((self.init_bgt - self.target_bgt) * (mul_coeff**3) + self.target_bgt)
+            budget = int(
+                (self.init_bgt - self.target_bgt) * (mul_coeff**3) + self.target_bgt
+            )
             mask_ind = True if step % self.peft_config.deltaT == 0 else False
         return budget, mask_ind
 
@@ -582,10 +686,14 @@ class RankAllocator(object):
                 with torch.no_grad():
                     self.ipt[n] = (p * p.grad).abs().detach()
                     # Sensitivity smoothing
-                    self.exp_avg_ipt[n] = self.beta1 * self.exp_avg_ipt[n] + (1 - self.beta1) * self.ipt[n]
+                    self.exp_avg_ipt[n] = (
+                        self.beta1 * self.exp_avg_ipt[n]
+                        + (1 - self.beta1) * self.ipt[n]
+                    )
                     # Uncertainty quantification
                     self.exp_avg_unc[n] = (
-                        self.beta2 * self.exp_avg_unc[n] + (1 - self.beta2) * (self.ipt[n] - self.exp_avg_ipt[n]).abs()
+                        self.beta2 * self.exp_avg_unc[n]
+                        + (1 - self.beta2) * (self.ipt[n] - self.exp_avg_ipt[n]).abs()
                     )
 
     def _element_score(self, n):
@@ -645,7 +753,9 @@ class RankAllocator(object):
             for n, p in model.named_parameters():
                 if f"lora_E.{self.adapter_name}" in n:
                     p.masked_fill_(triplet_ipt[n] <= mask_threshold, 0.0)
-                    rank_pattern[n] = (~(triplet_ipt[n] <= mask_threshold)).view(-1).tolist()
+                    rank_pattern[n] = (
+                        (~(triplet_ipt[n] <= mask_threshold)).view(-1).tolist()
+                    )
         return rank_pattern
 
     def update_and_allocate(self, model, global_step, force_mask=False):
@@ -669,6 +779,10 @@ class RankAllocator(object):
         with torch.no_grad():
             for n, p in model.named_parameters():
                 if f"lora_E.{self.adapter_name}" in n:
-                    key = n if not is_adapter_name_truncated else n.replace(f".{self.adapter_name}", "")
+                    key = (
+                        n
+                        if not is_adapter_name_truncated
+                        else n.replace(f".{self.adapter_name}", "")
+                    )
                     mask = torch.Tensor(rank_pattern[key]).unsqueeze(-1).to(p.device)
                     p.masked_fill_(~mask.bool(), 0.0)

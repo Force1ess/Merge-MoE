@@ -19,7 +19,12 @@
 
 __version__ = "0.3.0.dev0"
 
-from .mapping import MODEL_TYPE_TO_PEFT_MODEL_MAPPING, PEFT_TYPE_TO_CONFIG_MAPPING, get_peft_config, get_peft_model
+from .mapping import (
+    MODEL_TYPE_TO_PEFT_MODEL_MAPPING,
+    PEFT_TYPE_TO_CONFIG_MAPPING,
+    get_peft_config,
+    get_peft_model,
+)
 from .peft_model import (
     PeftModel,
     PeftModelForCausalLM,
@@ -46,7 +51,7 @@ from .tuners import (
     MMOELoraConfigS,
     MMOELoraModelS,
     EVELoraConfig,
-    EVELoraModel
+    EVELoraModel,
 )
 from .utils import (
     TRANSFORMERS_MODELS_TO_PREFIX_TUNING_POSTPROCESS_MAPPING,
