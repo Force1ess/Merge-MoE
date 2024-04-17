@@ -124,7 +124,12 @@ def set_peft_model_state_dict(model, peft_model_state_dict, adapter_name="defaul
     else:
         state_dict = peft_model_state_dict
 
-    if config.peft_type in (PeftType.LORA, PeftType.ADALORA, PeftType.MMOELORAS, PeftType.EVELORA):
+    if config.peft_type in (
+        PeftType.LORA,
+        PeftType.ADALORA,
+        PeftType.MMOELORAS,
+        PeftType.EVELORA,
+    ):
         peft_model_state_dict = {}
         for k, v in state_dict.items():
             if "lora_" in k:

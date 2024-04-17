@@ -4,3 +4,6 @@ models
 data
 __pycache__
 *txt
+saved_models
+.vscode
+wandb

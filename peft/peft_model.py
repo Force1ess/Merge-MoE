@@ -337,7 +337,6 @@ class PeftModel(PushToHubMixin, torch.nn.Module):
 
             all_param += num_params
             if param.requires_grad:
-                print(f'trainable param: {name} || {num_params}')
                 trainable_params += num_params
         print(
             f"trainable params: {trainable_params} || all params: {all_param} || trainable%: {100 * trainable_params / all_param}"

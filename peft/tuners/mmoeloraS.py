@@ -94,9 +94,9 @@ class MMOELoraModelS(MMOELoraModel):
                                     "fan_in_fan_out is set to True but the target module is `torch.nn.Linear`. "
                                     "Setting fan_in_fan_out to False."
                                 )
-                                kwargs[
-                                    "fan_in_fan_out"
-                                ] = lora_config.fan_in_fan_out = False
+                                kwargs["fan_in_fan_out"] = (
+                                    lora_config.fan_in_fan_out
+                                ) = False
                         elif isinstance(target, Conv1D):
                             in_features, out_features = (
                                 target.weight.ds_shape
@@ -108,9 +108,9 @@ class MMOELoraModelS(MMOELoraModel):
                                     "fan_in_fan_out is set to False but the target module is `Conv1D`. "
                                     "Setting fan_in_fan_out to True."
                                 )
-                                kwargs[
-                                    "fan_in_fan_out"
-                                ] = lora_config.fan_in_fan_out = True
+                                kwargs["fan_in_fan_out"] = (
+                                    lora_config.fan_in_fan_out
+                                ) = True
                         else:
                             raise ValueError(
                                 f"Target module {target} is not supported. "

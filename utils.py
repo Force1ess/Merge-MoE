@@ -1,6 +1,9 @@
 import torch
 import pandas as pd
 import os
+import sys
+import requests
+import logging
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm.auto import tqdm
@@ -8,6 +11,41 @@ from transformers import AutoModelForCausalLM
 
 model = None
 device = None
+hostname = os.uname()[1]
+
+def dir_check(dir_path: str, overwrite: bool = True):
+    if overwrite:
+        if not os.path.isdir(dir_path):
+            os.makedirs(dir_path, exist_ok=True)  # 防止多个进程同时创建
+        return dir_path
+
+    if os.path.exists(dir_path):
+        if not os.path.isdir(dir_path):
+            logging.warninging(f"{dir_path} have been created, but it is not a dir")
+        elif len(os.listdir(dir_path)) != 0:
+            orig_path = dir_path
+            dir_path = orig_path + time.strftime("%m-%d-%H-%M")
+            logging.warninging(
+                f"{orig_path} have been created, and it is not empty, thus dir_path moved to {dir_path}"
+            )
+        else:
+            return dir_path
+        os.makedirs(dir_path, exist_ok=True)
+        return dir_path
+
+def send_feishu(msg):
+    msg = str(msg)
+    headers = {"Content-Type": "application/json"}
+    data = {
+        "msg_type": "text",
+        "content": {"text": hostname + ": " + msg + "".join(sys.argv)},
+    }
+    response = requests.post(
+        "https://www.feishu.cn/flow/api/trigger-webhook/01db450d719418d75f29a1b637cf2ca4",
+        json=data,
+        headers=headers,
+    )
+    return response.json()
 
 
 # GB
@@ -59,11 +97,7 @@ def prepare_teacher_cache(dataloader, collate_fn, training_args, cache_dir):
 
         device = device = torch.cuda.current_device()
         model.to(device)  #! torch ddp 之前必须先move过来
-        model = DDP(
-            model,
-            device_ids=[device],
-            output_device=device
-        )
+        model = DDP(model, device_ids=[device], output_device=device)
     model.eval()
     futures = []
     executor = ThreadPoolExecutor(max_workers=training_args.data_workers)

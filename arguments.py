@@ -1,71 +1,41 @@
 from dataclasses import dataclass, field
 from typing import Optional
+import torch
+from transformers import TrainingArguments
 import os
 
 
-def check_flash_attention_2_exists():
-    try:
-        __import__("flash-attn")
-        return "flash_attention_2"
-    except ModuleNotFoundError:
-        print("flash-attn not found, using default attention implementation.")
-        return None
-
-
 @dataclass
-class TraningArguments:
+class TraningArguments(TrainingArguments):
     model_name_or_path: Optional[str] = field(
         default="AIChenKai/TinyLlama-1.1B-Chat-v1.0-x2-MoE"
     )
-    batch_size: Optional[int] = field(default=4)
     model_max_length: int = field(
         default=2048,
         metadata={
             "help": "Maximum sequence length. Sequences will be right padded (and possibly truncated)."
         },
     )
+    attn_implementation: Optional[str] = field(
+        default=None,
+        metadata={"help": "The implementation of attention mechanism."},
+    )
     data_workers: int = field(
-        default=os.cpu_count(),
+        default=min(os.cpu_count() // torch.cuda.device_count() // 2, 32),
         metadata={
             "help": "Number of subprocesses to use for data loading (PyTorch only). "
             "0 means that the data will be loaded in the main process."
         },
     )
-    pin_memory: bool = field(
+    dataloader_pin_memory: bool = field(
         default=True,
         metadata={"help": "Whether to pin memory for faster data transfer."},
     )
-    do_cache: bool = field(
-        default=True,
-        metadata={"help": "Whether to cache the teacher outputs."},
-    )
-    cache_dir: str = field(
-        default="teacher_cache",
-        metadata={"help": "The directory to cache the teacher outputs."},
-    )
-    cache_step: int = field(
-        default=40,
-        metadata={"help": "Number of steps to cache the teacher outputs."},
-    )
-    num_train_epochs: int = field(
-        default=1, metadata={"help": "Total number of training epochs to perform."}
-    )
-    learning_rate: float = field(
-        default=5e-5, metadata={"help": "The initial learning rate for Adam."}
-    )
-    attn_implementation: str = field(
-        default=check_flash_attention_2_exists(),
-        metadata={"help": "The implementation of attention layer."},
-    )
-    gradient_accumulation_steps: int = field(
-        default=1,
+    output_dir: Optional[str] = field(
+        default="saved_models",
         metadata={
-            "help": "Number of updates steps to accumulate before performing a backward/update pass."
+            "help": "The output directory where the model predictions and checkpoints will be written."
         },
-    )
-    local_rank: int = field(
-        default=-1,
-        metadata={"help": "For distributed training: local_rank"},
     )
 
 
@@ -91,11 +61,9 @@ class DataArguments:
 
 @dataclass
 class DistillArguments:
-    distill_temperature: float = field(
-        default=2.0, metadata={"help": "Temperature for distillation."}
-    )
-    hard_label_weight: float = field(
-        default=0.2, metadata={"help": "Weight for hard label loss."}
+    distill_config: str = field(
+        default="configs/mini_distill_config.json",
+        metadata={"help": "The path to the distillation config file."},
     )
     lora_r: int = field(default=512, metadata={"help": "Lora R dimension."})
     lora_alpha: float = field(default=16, metadata={"help": " Lora alpha."})

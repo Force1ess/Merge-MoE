@@ -1,0 +1,41 @@
+{
+    "temperature": 2,
+    "temperature_scheduler": "none",
+    "hard_label_weight": 1,
+    "hard_label_weight_scheduler": "none",
+    "kd_loss_type": "ce",
+    "kd_loss_weight": 1,
+    "kd_loss_weight_scheduler": "none",
+    "probability_shift": false,
+    "intermediate_matches": [
+        {
+            "layer_T": 1,
+            "layer_S": 1,
+            "feature": "hidden_states",
+            "loss": "hidden_mse",
+            "weight": 1
+        },
+        {
+            "layer_T": 7,
+            "layer_S": 7,
+            "feature": "hidden_states",
+            "loss": "hidden_mse",
+            "weight": 1
+        },
+        {
+            "layer_T": 14,
+            "layer_S": 14,
+            "feature": "hidden_states",
+            "loss": "hidden_mse",
+            "weight": 1
+        },
+        {
+            "layer_T": 21,
+            "layer_S": 21,
+            "feature": "hidden_states",
+            "loss": "hidden_mse",
+            "weight": 1
+        }
+    ],
+    "is_caching_logits": false
+}
