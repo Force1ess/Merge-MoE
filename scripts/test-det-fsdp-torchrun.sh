@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# 获取可用 CUDA 设备数量
 CUDA_DEVICES_COUNT=$(nvidia-smi --list-gpus | wc -l)
 
 # 尝试获取一个未被使用的随机端口
@@ -12,9 +11,7 @@ while true; do
     fi
 done
 
-# 使用 CUDA 设备数量作为 nproc_per_node 的值运行 torchrun
 torchrun --master_port $random_port --nproc_per_node $CUDA_DEVICES_COUNT main.py \
-    --output_dir $2 \
     --save_only_model True \
     --per_device_train_batch_size 4 \
     --distill_config $1\

@@ -14,7 +14,6 @@ done
 
 # 使用 CUDA 设备数量作为 nproc_per_node 的值运行 torchrun
 torchrun --master_port $random_port --nproc_per_node $CUDA_DEVICES_COUNT main.py \
-    --output_dir $2 \
     --num_train_epochs 1 \
     --save_only_model True \
     --per_device_train_batch_size 4 \
@@ -32,8 +31,8 @@ torchrun --master_port $random_port --nproc_per_node $CUDA_DEVICES_COUNT main.py
     --lr_scheduler_type "cosine" \
     --fsdp "full_shard auto_wrap" \
     --gradient_accumulation_steps 4 \
-    --attn_implementation "flash_attention_2" \
     --fsdp_transformer_layer_cls_to_wrap 'MixtralDecoderLayer'
+    #--attn_implementation "flash_attention_2" \
     # --tf32 True \
     # --gradient_checkpointing True \
     # --gradient_accumulation_steps 16 \

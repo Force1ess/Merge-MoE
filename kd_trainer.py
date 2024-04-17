@@ -61,8 +61,7 @@ class KDTrainer(Trainer):
             optimizers=optimizers,
             preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         )
-        self.teacher_accelerator = Accelerator()
-        self.teacher_model = self.teacher_accelerator.prepare(teacher_model)
+        self.teacher_model = teacher_model
         self.teacher_model.eval()
 
         self.d_config = distill_config

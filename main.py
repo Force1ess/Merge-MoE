@@ -15,6 +15,7 @@ from transformers import (
     DataCollatorForLanguageModeling,
     AutoModelForCausalLM,
 )
+from pathlib import Path
 from datasets import load_dataset, load_from_disk
 from utils import send_feishu, dir_check
 
@@ -37,7 +38,7 @@ def main():
     )
 
     if data_args.split == 'train' :
-        dataset = load_from_disk('/ceph_home/zhenghao2022/cache/train_toks')
+        dataset = load_from_disk('/mnt/ceph_home/zhenghao2022/cache/train_toks')
 
     else:
         dataset = load_dataset(**vars(data_args))
@@ -83,7 +84,7 @@ def main():
     
     training_args.output_dir = os.path.join(
         training_args.output_dir,
-        f"{training_args.model_name_or_path}-bs{training_args.per_device_train_batch_size*torch.cuda.device_count()*training_args.gradient_accumulation_steps}-{data_args.path.split('/')[-1]}".replace(
+        f"{training_args.model_name_or_path}-bs{training_args.per_device_train_batch_size*torch.cuda.device_count()*training_args.gradient_accumulation_steps}-{Path(distill_args.distill_config).stem}".replace(
             "/", "-"
         ),
     )
