@@ -37,24 +37,24 @@ def main():
         pad_to_multiple_of=16,
     )
 
-    if data_args.split == 'train' :
-        dataset = load_from_disk('/mnt/ceph_home/zhenghao2022/cache/train_toks')
+    if data_args.split == "train":
+        dataset = load_from_disk("/mnt/ceph_home/zhenghao2022/cache/train_toks")
 
     else:
         dataset = load_dataset(**vars(data_args))
         dataset = dataset.map(
-        lambda x: {
-            "input_ids": tokenizer(
-                x["text"],
-                truncation=True,
-                max_length=training_args.model_max_length,
-                padding=False,
-            )["input_ids"]
-        },
-        keep_in_memory=data_args.keep_in_memory,
-        num_proc=training_args.data_workers,
-        remove_columns=dataset.column_names,
-    )
+            lambda x: {
+                "input_ids": tokenizer(
+                    x["text"],
+                    truncation=True,
+                    max_length=training_args.model_max_length,
+                    padding=False,
+                )["input_ids"]
+            },
+            keep_in_memory=data_args.keep_in_memory,
+            num_proc=training_args.data_workers,
+            remove_columns=dataset.column_names,
+        )
 
     eve_config = EVELoraConfig(
         task_type=TaskType.CAUSAL_LM,
@@ -63,25 +63,20 @@ def main():
         lora_alpha=distill_args.lora_alpha,
         lora_dropout=distill_args.lora_dropout,
     )
-    teacher_model = AutoModelForCausalLM.from_pretrained(
-        training_args.model_name_or_path,
-        attn_implementation=training_args.attn_implementation,
-        torch_dtype=torch.bfloat16,
-        device_map="cuda",
-    )
-    teacher_model.eval()
-    student_model = get_peft_model(
-        AutoModelForCausalLM.from_pretrained(
-            training_args.model_name_or_path,
-            attn_implementation=training_args.attn_implementation,
-            torch_dtype=torch.bfloat16,
-            device_map="cuda",
-        ),
-        eve_config,
-    )
-    student_model.print_trainable_parameters()
+    config = transformers.AutoConfig.from_pretrained(training_args.model_name_or_path)
+    config.num_hidden_layers = 2
 
-    
+    eve_model = get_peft_model(
+        AutoModelForCausalLM.from_config(config),
+    #     AutoModelForCausalLM.from_pretrained(
+    #          training_args.model_name_or_path,
+    #          attn_implementation=training_args.attn_implementation,
+    #          torch_dtype=torch.bfloat16,
+    #      ),
+         eve_config,
+    )
+    eve_model.print_trainable_parameters()
+
     training_args.output_dir = os.path.join(
         training_args.output_dir,
         f"{training_args.model_name_or_path}-bs{training_args.per_device_train_batch_size*torch.cuda.device_count()*training_args.gradient_accumulation_steps}-{Path(distill_args.distill_config).stem}".replace(
@@ -89,24 +84,17 @@ def main():
         ),
     )
     dir_check(training_args.output_dir)
-    # Distillation configuration
-    # Matching different layers of the student and the teacher
-    # 所有22个层都是一样的
-    # 会不会是我的causal lm 没有label的问题
     distill_config = DistillationConfig(
         **json.load(open(distill_args.distill_config, "r"))
     )
     trainer = KDTrainer(
-        student_model,
-        teacher_model,
+        eve_model,
         distill_config,
         training_args,
         data_collator,
         dataset,
         tokenizer=tokenizer,
     )
-    if training_args.local_rank == 0:
-        print("FSDP Plugin: \n", trainer.accelerator.state.fsdp_plugin)
     trainer.train()
     send_feishu(f"训练完成，模型保存在{training_args.output_dir}")
 

@@ -3,15 +3,22 @@ import pandas as pd
 import os
 import sys
 import requests
+import time
 import logging
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm.auto import tqdm
+print = tqdm.write
 from transformers import AutoModelForCausalLM
 
 model = None
 device = None
 hostname = os.uname()[1]
+rank = os.getenv("RANK", None)
+
+def rank0_print(text):
+    if rank is None or int(rank) == 0:
+        print(text)
 
 def dir_check(dir_path: str, overwrite: bool = True):
     if overwrite:

@@ -230,10 +230,10 @@ class DistillationConfig(Config):
         hard_label_weight=0,
         hard_label_weight_scheduler="none",
         kd_loss_type="ce",
-        kd_loss_weight=1,
         kd_loss_weight_scheduler="none",
         probability_shift=False,
         intermediate_matches: Optional[List[Dict]] = None,
+        intermediate_loss_weight = 0.1,
         is_caching_logits=False,
     ):
         super(DistillationConfig, self).__init__()
@@ -257,7 +257,6 @@ class DistillationConfig(Config):
             ]
 
         self.kd_loss_type = kd_loss_type
-        self.kd_loss_weight = kd_loss_weight
         self.kd_loss_weight_scheduler = None
         if kd_loss_weight_scheduler != "none":
             assert (
@@ -274,3 +273,4 @@ class DistillationConfig(Config):
             ]
 
         self.is_caching_logits = is_caching_logits
+        self.intermediate_loss_weight = intermediate_loss_weight

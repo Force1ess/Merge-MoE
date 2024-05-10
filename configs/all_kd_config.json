@@ -4,9 +4,9 @@
     "hard_label_weight": 1,
     "hard_label_weight_scheduler": "none",
     "kd_loss_type": "ce",
-    "kd_loss_weight": 1,
     "kd_loss_weight_scheduler": "none",
     "probability_shift": false,
+    "intermediate_loss_weight": 0.1,
     "intermediate_matches": [
             {
             "layer_T": 2,
@@ -137,20 +137,6 @@
         {
             "layer_T": 20,
             "layer_S": 20,
-            "feature": "hidden_states",
-            "loss": "hidden_mse",
-            "weight": 1
-        },
-        {
-            "layer_T": 21,
-            "layer_S": 21,
-            "feature": "hidden_states",
-            "loss": "hidden_mse",
-            "weight": 1
-        },
-        {
-            "layer_T": 22,
-            "layer_S": 22,
             "feature": "hidden_states",
             "loss": "hidden_mse",
             "weight": 1

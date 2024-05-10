@@ -1,5 +1,4 @@
 from typing import Callable, Dict, List, Optional, Tuple, Union
-from accelerate import Accelerator
 from transformers.trainer import (
     PreTrainedModel,
     PreTrainedTokenizerBase,
@@ -12,6 +11,7 @@ from transformers.trainer import (
     Dataset,
     MODEL_FOR_CAUSAL_LM_MAPPING_NAMES,
     _is_peft_model,
+    DEFAULT_PROGRESS_CALLBACK,
 )
 from textbrewer import (
     DistillationConfig,
@@ -20,17 +20,16 @@ from textbrewer import (
     FEATURES,
     PROJ_MAP,
 )
-from textbrewer.distiller_utils import select_logits_with_mask, probability_shift_
 from transformers import DataCollatorForLanguageModeling
-from peft import PeftModel
+from utils import rank0_print
 
 import torch
+
 
 class KDTrainer(Trainer):
     def __init__(
         self,
         model: Union[PreTrainedModel, nn.Module],
-        teacher_model: Union[PreTrainedModel, nn.Module],
         distill_config: DistillationConfig,
         args: TrainingArguments,
         data_collator: DataCollatorForLanguageModeling,
@@ -61,13 +60,17 @@ class KDTrainer(Trainer):
             optimizers=optimizers,
             preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         )
-        self.teacher_model = teacher_model
-        self.teacher_model.eval()
-
+        self.logging_steps = args.logging_steps
+        self.step = 0
         self.d_config = distill_config
         self.kd_loss = KD_LOSS_MAP[self.d_config.kd_loss_type]
         self.projs = []
         self.projs_group = []
+        self.pbar_handler = None
+        for i in self.callback_handler.callbacks:
+            if isinstance(i, DEFAULT_PROGRESS_CALLBACK):
+                self.pbar_handler = i
+                break
         for im in self.d_config.intermediate_matches:
             if im.proj is not None:
                 projection = im.proj[0]
@@ -89,10 +92,8 @@ class KDTrainer(Trainer):
         Subclass and override for custom behavior.
         """
 
+        self.step+=1
         total_loss = 0
-
-        with torch.no_grad():
-            results_T = self.teacher_model(**inputs, output_hidden_states=True)
 
         # Below is copied from transformers.Trainer.compute_loss() in transformer@2f12e40
         if self.d_config.hard_label_weight > 0:
@@ -130,40 +131,33 @@ class KDTrainer(Trainer):
         results_S = outputs
         # KD loss copied from textbrewer general distiller without custom match and loss dict
         total_kd_loss = 0
-        if "logits_mask" in results_S:
-            masks_list_S = results_S["logits_mask"]
-            logits_list_S = select_logits_with_mask(
-                logits_list_S, masks_list_S
-            )  # (mask_sum, num_of_class)
-        if "logits_mask" in results_T:
-            masks_list_T = results_T["logits_mask"]
-            logits_list_T = select_logits_with_mask(logits_list_T, masks_list_T)
-        if self.d_config.probability_shift is True:
-            labels_list = results_S["labels"]
-            for l_T, l_S, labels in zip(logits_list_T, logits_list_S, labels_list):
-                l_T = probability_shift_(l_T, labels)
-                if self.d_config.temperature_scheduler is not None:
-                    temperature = self.d_config.temperature_scheduler(
-                        l_S, l_T, self.d_config.temperature
-                    )
-                else:
-                    temperature = self.d_config.temperature
-                total_kd_loss += self.kd_loss(l_S, l_T, temperature)
-        else:
-            for l_T, l_S in zip(results_T.logits, results_S.logits):
-                if self.d_config.temperature_scheduler is not None:
-                    temperature = self.d_config.temperature_scheduler(
-                        l_S, l_T, self.d_config.temperature
-                    )
-                else:
-                    temperature = self.d_config.temperature
-                total_kd_loss += self.kd_loss(l_S, l_T, temperature)
-        total_loss += total_kd_loss * self.d_config.kd_loss_weight
+        results_T = {
+            "hidden_states": [
+                l.eve_hidden_states for l in model.module.model.model.layers
+            ]
+        }
+        results_T["hidden_states"].append(
+            model.module.model.model.norm(results_T["hidden_states"][-1])
+        )
+        results_T["logits"] = model.module.lm_head(
+            results_T["hidden_states"][-1]
+        ).float()
 
+        for l_T, l_S in zip(results_T["logits"], results_S.logits):
+            if self.d_config.temperature_scheduler is not None:
+                temperature = self.d_config.temperature_scheduler(
+                    l_S, l_T, self.d_config.temperature
+                )
+            else:
+                temperature = self.d_config.temperature
+                total_kd_loss += self.kd_loss(l_S, l_T, temperature)
+
+        total_loss += total_kd_loss 
         inters_T = {feature: results_T.get(feature, []) for feature in FEATURES}
         inters_S = {feature: results_S.get(feature, []) for feature in FEATURES}
-        inputs_mask_T = results_T.get("inputs_mask", None)
-        inputs_mask_S = results_S.get("inputs_mask", None)
+        # inputs_mask_T = results_T.get("inputs_mask", None)
+        # inputs_mask_S = results_S.get("inputs_mask", None)
+        total_inter_loss = 0
         for ith, inter_match in enumerate(self.d_config.intermediate_matches):
             layer_T = inter_match.layer_T
             layer_S = inter_match.layer_S
@@ -188,15 +182,17 @@ class KDTrainer(Trainer):
                 if self.projs[ith]:
                     # inter_T = self.projs[ith](inter_T)
                     inter_S = self.projs[ith](inter_S)
-            intermediate_loss = match_loss(inter_S, inter_T, mask=inputs_mask_S)
-            total_loss += intermediate_loss * match_weight
-
-        # TODO multi gpu loss?
-        if "losses" in results_S:
-            total_hl_loss = 0
-            for loss in results_S["losses"]:
-                # in case of multi-GPU
-                total_hl_loss += loss.mean()
-            total_loss += total_hl_loss * self.d_config.hard_label_weight
-
-        return (total_loss, outputs) if return_outputs else loss
+            intermediate_loss = match_loss(
+                inter_S, inter_T, mask=None
+            )  
+            total_inter_loss += intermediate_loss * match_weight
+        total_loss += total_inter_loss * self.d_config.intermediate_loss_weight
+        if (
+            self.step % self.logging_steps == 0
+            and self.pbar_handler is not None
+            and self.pbar_handler.training_bar is not None
+        ):
+            self.pbar_handler.training_bar.write(
+                f"Step {self.step}: [0]Label Loss {loss * self.d_config.hard_label_weight} [1]Logits loss {total_kd_loss * self.d_config.kd_loss_weight} [2]Inter loss {total_inter_loss * self.d_config.intermediate_loss_weight}"
+            )
+        return (total_loss, outputs) if return_outputs else total_loss

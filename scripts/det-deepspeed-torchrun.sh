@@ -14,24 +14,22 @@ done
 
 # 使用 CUDA 设备数量作为 nproc_per_node 的值运行 torchrun
 torchrun --master_port $random_port --nproc_per_node $CUDA_DEVICES_COUNT main.py \
-    --num_train_epochs 1 \
+    --num_train_epochs 3 \
     --save_only_model True \
-    --per_device_train_batch_size 4 \
+    --per_device_train_batch_size 16\
     --distill_config $1\
     --logging_steps 20 \
-    --model_max_length 2048 \
+    --model_max_length 4096\
     --bf16 True \
     --split "train" \
     --save_strategy "steps" \
     --save_steps "2500" \
-    --save_total_limit 5 \
     --learning_rate 4e-5 \
     --weight_decay 0. \
     --warmup_ratio 0.03 \
     --lr_scheduler_type "cosine" \
-    --fsdp "full_shard auto_wrap" \
-    --gradient_accumulation_steps 4 \
-    --fsdp_transformer_layer_cls_to_wrap 'EVEMixtralDecoderLayer'
+    --deepspeed $2
+    #--gradient_accumulation_steps 1 \
     #--attn_implementation "flash_attention_2" \
     # --tf32 True \
     # --gradient_checkpointing True \

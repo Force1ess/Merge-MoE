@@ -13,7 +13,7 @@ torchrun --nproc_per_node=2 main.py \
     --warmup_ratio 0.03 \
     --lr_scheduler_type "cosine" \
     --fsdp "full_shard auto_wrap" \
-    --fsdp_transformer_layer_cls_to_wrap 'MixtralDecoderLayer' 
+    --fsdp_transformer_layer_cls_to_wrap 'EVEMixtralDecoderLayer' 
     # --tf32 True \
     # --gradient_checkpointing True \
     # --gradient_accumulation_steps 16 \

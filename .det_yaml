@@ -1,4 +1,6 @@
+# Mount 路径，对于只读的路径添加 read_only
 bind_mounts:
+  # 每个人的默认目录
   - host_path: /shared_home
     container_path: /mnt/shared_home
 
@@ -6,10 +8,10 @@ bind_mounts:
     container_path: /mnt/ceph_home
  
 environment:
-  image: docker.cipsup.cn/nvcr.io/nvidia/pytorch@sha256:12af6f25d316494bb15c3dcdb07400beeb0b31ffc37f4cd97f5cf3985235da34
+  image: docker.cipsup.cn/dengziliang/cuda113@sha256:2747cfe7775fd5942ad86a1f629af8fb4c214eef79a74fba8a1166815577b1a7
  
 resources:
-  resource_pool: A100-80G # 其他可选：A100-40 A100-80G
-  slots: 1                     # slots为0代表CPU容器，不占用GPU
+  resource_pool: TITAN-24G # 其他可选：A100-40 A100-80G
+  slots: 0                     # slots为0代表CPU容器，不占用GPU
  
 work_dir: /mnt/ceph_home/zhenghao2022 # 将每个人的ceph_home 作为登陆的默认路径，推荐做法

@@ -29,7 +29,7 @@ torchrun --master_port $random_port --nproc_per_node $CUDA_DEVICES_COUNT main.py
     --fsdp "full_shard auto_wrap" \
     --gradient_accumulation_steps 4 \
     --num_train_epochs 1 \
-    --fsdp_transformer_layer_cls_to_wrap 'MixtralDecoderLayer'
+    --fsdp_transformer_layer_cls_to_wrap 'EVEMixtralDecoderLayer'
     # --tf32 True \
     # --gradient_checkpointing True \
     # --gradient_accumulation_steps 16 \
