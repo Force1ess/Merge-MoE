@@ -8,7 +8,7 @@ import os
 @dataclass
 class TraningArguments(TrainingArguments):
     model_name_or_path: Optional[str] = field(
-        default="Mini-Mixtral-v0.2"
+        default="./Mini-Mixtral-v0.2"
     )
     model_max_length: int = field(
         default=2048,
@@ -42,7 +42,7 @@ class TraningArguments(TrainingArguments):
 @dataclass
 class DataArguments:
     path: Optional[str] = field(
-        default="JeanKaddour/minipile",
+        default="./minipile",
         metadata={"help": "The name of the dataset to use (via the datasets library)."},
     )
     split: Optional[str] = field(

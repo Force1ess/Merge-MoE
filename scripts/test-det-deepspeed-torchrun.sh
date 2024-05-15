@@ -8,6 +8,7 @@ while true; do
     fi
 done
 torchrun --master_port $random_port --nproc_per_node $CUDA_DEVICES_COUNT main.py \
+    --output_dir 'saved_models/test'
     --num_train_epochs 3 \
     --save_only_model True \
     --per_device_train_batch_size 8\
