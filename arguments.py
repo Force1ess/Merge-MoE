@@ -8,7 +8,7 @@ import os
 @dataclass
 class TraningArguments(TrainingArguments):
     model_name_or_path: Optional[str] = field(
-        default="AIChenKai/TinyLlama-1.1B-Chat-v1.0-x2-MoE"
+        default="Mini-Mixtral-v0.2"
     )
     model_max_length: int = field(
         default=2048,
@@ -65,7 +65,7 @@ class DistillArguments:
         default="configs/mini_distill_config.json",
         metadata={"help": "The path to the distillation config file."},
     )
-    lora_r: int = field(default=512, metadata={"help": "Lora R dimension."})
+    lora_r: int = field(default=128, metadata={"help": "Lora R dimension."})
     lora_alpha: float = field(default=16, metadata={"help": " Lora alpha."})
     lora_dropout: float = field(default=0.0, metadata={"help": "Lora dropout."})
     merge_method: str = field(

@@ -10,12 +10,12 @@ done
 torchrun --master_port $random_port --nproc_per_node $CUDA_DEVICES_COUNT main.py \
     --num_train_epochs 3 \
     --save_only_model True \
-    --per_device_train_batch_size 16\
+    --per_device_train_batch_size 8\
     --distill_config $1\
     --logging_steps 50 \
     --model_max_length 4096\
     --tf32 True \
-    --split "train" \
+    --split "test[:128]" \
     --save_strategy "epoch" \
     --report_to "wandb" \
     --warmup_ratio 0.03 \

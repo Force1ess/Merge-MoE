@@ -133,7 +133,7 @@ class KDTrainer(Trainer):
         total_kd_loss = 0
         results_T = {
             "hidden_states": [
-                l.eve_hidden_states for l in model.module.model.model.layers
+                l.block_sparse_hidden_states for l in model.module.model.model.layers
             ]
         }
         results_T["hidden_states"].append(
@@ -155,8 +155,6 @@ class KDTrainer(Trainer):
         total_loss += total_kd_loss 
         inters_T = {feature: results_T.get(feature, []) for feature in FEATURES}
         inters_S = {feature: results_S.get(feature, []) for feature in FEATURES}
-        # inputs_mask_T = results_T.get("inputs_mask", None)
-        # inputs_mask_S = results_S.get("inputs_mask", None)
         total_inter_loss = 0
         for ith, inter_match in enumerate(self.d_config.intermediate_matches):
             layer_T = inter_match.layer_T
@@ -169,19 +167,9 @@ class KDTrainer(Trainer):
             if type(layer_S) is list and type(layer_T) is list:
                 inter_S = [inters_S[feature][s] for s in layer_S]
                 inter_T = [inters_T[feature][t] for t in layer_T]
-                name_S = "-".join(map(str, layer_S))
-                name_T = "-".join(map(str, layer_T))
-                if self.projs[ith]:
-                    # inter_T = [self.projs[ith](t) for t in inter_T]
-                    inter_S = [self.projs[ith](s) for s in inter_S]
             else:
                 inter_S = inters_S[feature][layer_S]
                 inter_T = inters_T[feature][layer_T]
-                name_S = str(layer_S)
-                name_T = str(layer_T)
-                if self.projs[ith]:
-                    # inter_T = self.projs[ith](inter_T)
-                    inter_S = self.projs[ith](inter_S)
             intermediate_loss = match_loss(
                 inter_S, inter_T, mask=None
             )  

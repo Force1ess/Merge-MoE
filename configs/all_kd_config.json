@@ -6,7 +6,7 @@
     "kd_loss_type": "ce",
     "kd_loss_weight_scheduler": "none",
     "probability_shift": false,
-    "intermediate_loss_weight": 0.1,
+    "intermediate_loss_weight": 1,
     "intermediate_matches": [
             {
             "layer_T": 2,

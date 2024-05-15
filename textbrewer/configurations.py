@@ -233,7 +233,7 @@ class DistillationConfig(Config):
         kd_loss_weight_scheduler="none",
         probability_shift=False,
         intermediate_matches: Optional[List[Dict]] = None,
-        intermediate_loss_weight = 0.1,
+        intermediate_loss_weight = 1,
         is_caching_logits=False,
     ):
         super(DistillationConfig, self).__init__()

@@ -1,4 +1,5 @@
 import json
+import socket
 import os
 from kd_trainer import KDTrainer
 from arguments import (
@@ -18,12 +19,9 @@ from transformers import (
 from pathlib import Path
 from datasets import load_dataset, load_from_disk
 from utils import send_feishu, dir_check
+from datetime import datetime
 
-
-# 也许可以存一个topk的logits，但问题是hidden_states也太大了
 def main():
-    # set_debug_level(DebugLevel.OFF)
-    # parse arguments and prepare dataset, model, tokenizer, dataloader
     training_args, data_args, distill_args = transformers.HfArgumentParser(
         (TraningArguments, DataArguments, DistillArguments)
     ).parse_args_into_dataclasses()
@@ -36,13 +34,8 @@ def main():
         mlm=False,
         pad_to_multiple_of=16,
     )
-
-    if data_args.split == "train":
-        dataset = load_from_disk("/mnt/ceph_home/zhenghao2022/cache/train_toks")
-
-    else:
-        dataset = load_dataset(**vars(data_args))
-        dataset = dataset.map(
+    dataset = load_dataset(**vars(data_args))
+    dataset = dataset.map(
             lambda x: {
                 "input_ids": tokenizer(
                     x["text"],
@@ -63,17 +56,22 @@ def main():
         lora_alpha=distill_args.lora_alpha,
         lora_dropout=distill_args.lora_dropout,
     )
-    config = transformers.AutoConfig.from_pretrained(training_args.model_name_or_path)
-    config.num_hidden_layers = 2
+    if training_args.split == "train":
+        model = AutoModelForCausalLM.from_pretrained(
+            training_args.model_name_or_path,
+            attn_implementation=training_args.attn_implementation,
+            torch_dtype=torch.bfloat16,
+        )
+    else:
+        config = transformers.AutoConfig.from_pretrained(
+            training_args.model_name_or_path
+        )
+        config.num_hidden_layers = 2
+        model = AutoModelForCausalLM.from_config(config)
 
     eve_model = get_peft_model(
-        AutoModelForCausalLM.from_config(config),
-    #     AutoModelForCausalLM.from_pretrained(
-    #          training_args.model_name_or_path,
-    #          attn_implementation=training_args.attn_implementation,
-    #          torch_dtype=torch.bfloat16,
-    #      ),
-         eve_config,
+        model,
+        eve_config,
     )
     eve_model.print_trainable_parameters()
 
@@ -81,7 +79,8 @@ def main():
         training_args.output_dir,
         f"{training_args.model_name_or_path}-bs{training_args.per_device_train_batch_size*torch.cuda.device_count()*training_args.gradient_accumulation_steps}-{Path(distill_args.distill_config).stem}".replace(
             "/", "-"
-        ),
+        )
+        + datetime.now().strftime("%m-%d"),
     )
     dir_check(training_args.output_dir)
     distill_config = DistillationConfig(
@@ -96,7 +95,7 @@ def main():
         tokenizer=tokenizer,
     )
     trainer.train()
-    send_feishu(f"训练完成，模型保存在{training_args.output_dir}")
+    send_feishu(f"{socket.gethostname()}: 训练完成，模型保存在{training_args.output_dir}")
 
 
 if __name__ == "__main__":
