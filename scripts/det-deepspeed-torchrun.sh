@@ -10,17 +10,17 @@ done
 torchrun --master_port $random_port --nproc_per_node $CUDA_DEVICES_COUNT main.py \
     --num_train_epochs 3 \
     --save_only_model True \
-    --per_device_train_batch_size 16\
+    --bf16 True \
+    --per_device_train_batch_size 1\
     --distill_config $1\
     --logging_steps 50 \
     --model_max_length 4096\
-    --tf32 True \
     --split "train" \
     --save_strategy "epoch" \
     --report_to "wandb" \
     --warmup_ratio 0.03 \
     --lr_scheduler_type "cosine" \
-    --attn_implementation "flash_attention_2" \
+    --gradient_accumulation_steps 8\
     --deepspeed $2
-    #--gradient_accumulation_steps 1 \
-    #--bf16 True \
+    #--tf32 True \
+    #--attn_implementation "flash_attention_2" \
