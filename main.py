@@ -56,7 +56,7 @@ def main():
         lora_alpha=distill_args.lora_alpha,
         lora_dropout=distill_args.lora_dropout,
     )
-    if data_args.split == "train":
+    if data_args.split.startswith("train"):
         model = AutoModelForCausalLM.from_pretrained(
             training_args.model_name_or_path,
             attn_implementation=training_args.attn_implementation,
