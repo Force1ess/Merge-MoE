@@ -152,7 +152,7 @@ class KDTrainer(Trainer):
                 temperature = self.d_config.temperature
                 total_kd_loss += self.kd_loss(l_S, l_T, temperature)
 
-        total_loss += total_kd_loss 
+        total_loss += total_kd_loss * self.d_config.kd_loss_weight
         inters_T = {feature: results_T.get(feature, []) for feature in FEATURES}
         inters_S = {feature: results_S.get(feature, []) for feature in FEATURES}
         total_inter_loss = 0

@@ -231,6 +231,7 @@ class DistillationConfig(Config):
         hard_label_weight_scheduler="none",
         kd_loss_type="ce",
         kd_loss_weight_scheduler="none",
+        kd_loss_weight=1,
         probability_shift=False,
         intermediate_matches: Optional[List[Dict]] = None,
         intermediate_loss_weight = 1,
@@ -240,6 +241,7 @@ class DistillationConfig(Config):
 
         self.temperature = temperature
         self.temperature_scheduler = None
+        self.kd_loss_weight = kd_loss_weight
         if temperature_scheduler != "none":
             assert (
                 temperature_scheduler in TEMPERATURE_SCHEDULER

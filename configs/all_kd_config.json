@@ -5,6 +5,7 @@
     "hard_label_weight_scheduler": "none",
     "kd_loss_type": "ce",
     "kd_loss_weight_scheduler": "none",
+    "kd_loss_weight":1,
     "probability_shift": false,
     "intermediate_loss_weight": 1,
     "intermediate_matches": [
