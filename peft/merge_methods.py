@@ -12,7 +12,7 @@ def init_experts(
     expert_merge: str,
     expert_init: str,
 ):
-    merge_func = mergekit.get(expert_merge, lambda x,y,_:x[0])
+    merge_func = getattr(mergekit, expert_merge, lambda x,y,_:x[0])
     init_func = INIT_MAP.get(expert_init, lambda x:x)
     merge_func(experts, lora_experts, lora_args)
     init_func(experts, lora_experts, lora_args)

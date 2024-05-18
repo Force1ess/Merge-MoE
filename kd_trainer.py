@@ -118,7 +118,7 @@ class KDTrainer(Trainer):
         total_kd_loss = 0
         results_T = {
             "hidden_states": [
-                l.block_sparse_hidden_states for l in model.module.model.model.layers
+                l.block_sparse_hidden_states.detach() for l in model.module.model.model.layers
             ]
         }
         results_T["hidden_states"].append(
