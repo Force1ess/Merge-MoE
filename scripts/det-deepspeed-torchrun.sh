@@ -14,7 +14,7 @@ torchrun --master_port $random_port --nproc_per_node $CUDA_DEVICES_COUNT main.py
     --per_device_train_batch_size 1\
     --distill_config $1\
     --logging_steps 50 \
-    --model_max_length 4096\
+    --model_max_length 2048\
     --split "train" \
     --save_strategy "epoch" \
     --report_to "wandb" \

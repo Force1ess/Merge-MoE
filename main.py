@@ -15,11 +15,13 @@ from transformers import (
     AutoTokenizer,
     DataCollatorForLanguageModeling,
     AutoModelForCausalLM,
+    AutoConfig,
 )
 from pathlib import Path
 from datasets import load_dataset, load_from_disk
 from utils import send_feishu, dir_check
 from datetime import datetime
+
 
 def main():
     training_args, data_args, distill_args = transformers.HfArgumentParser(
@@ -36,18 +38,18 @@ def main():
     )
     dataset = load_dataset(**vars(data_args))
     dataset = dataset.map(
-            lambda x: {
-                "input_ids": tokenizer(
-                    x["text"],
-                    truncation=True,
-                    max_length=training_args.model_max_length,
-                    padding=False,
-                )["input_ids"]
-            },
-            keep_in_memory=data_args.keep_in_memory,
-            num_proc=training_args.data_workers,
-            remove_columns=dataset.column_names,
-        )
+        lambda x: {
+            "input_ids": tokenizer(
+                x["text"],
+                truncation=True,
+                max_length=training_args.model_max_length,
+                padding=False,
+            )["input_ids"]
+        },
+        keep_in_memory=data_args.keep_in_memory,
+        num_proc=training_args.data_workers,
+        remove_columns=dataset.column_names,
+    )
 
     eve_config = EVELoraConfig(
         task_type=TaskType.CAUSAL_LM,
@@ -56,6 +58,7 @@ def main():
         lora_alpha=distill_args.lora_alpha,
         lora_dropout=distill_args.lora_dropout,
     )
+    config = AutoConfig.from_pretrained(training_args.model_name_or_path)
     if data_args.split.startswith("train"):
         model = AutoModelForCausalLM.from_pretrained(
             training_args.model_name_or_path,
@@ -63,9 +66,6 @@ def main():
             torch_dtype=torch.bfloat16,
         )
     else:
-        config = transformers.AutoConfig.from_pretrained(
-            training_args.model_name_or_path
-        )
         config.num_hidden_layers = 2
         model = AutoModelForCausalLM.from_config(config)
 
@@ -83,8 +83,23 @@ def main():
         + datetime.now().strftime("%m-%d"),
     )
     dir_check(training_args.output_dir)
-    distill_config = DistillationConfig(
-        **json.load(open(distill_args.distill_config, "r"))
+    distill_config: dict = json.load(open(distill_args.distill_config, "r"))
+    sep_intermediate_layers = distill_config.pop("sep_intermediate_layers", 1)
+    distill_config = DistillationConfig.from_dict(
+        distill_config
+        | {
+            "intermediate_matches": [
+                {
+                    "layer_T": i,
+                    "layer_S": i,
+                    "loss": distill_args.intermediate_loss,
+                    "feature": "hidden_states",
+                    "weight": 1,
+                }
+                for i in range(config.num_hidden_layers - 1)
+                if i % sep_intermediate_layers == 0
+            ]
+        }
     )
     trainer = KDTrainer(
         eve_model,
@@ -95,8 +110,10 @@ def main():
         tokenizer=tokenizer,
     )
     trainer.train()
-    if os.environ.get("LOCAL_RANK", '0')=='0':
-        send_feishu(f"{socket.gethostname()}: 训练完成，模型保存在{training_args.output_dir}")
+    if os.environ.get("LOCAL_RANK", "0") == "0":
+        send_feishu(
+            f"{socket.gethostname()}: 训练完成，模型保存在{training_args.output_dir}"
+        )
 
 
 if __name__ == "__main__":

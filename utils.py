@@ -8,6 +8,7 @@ import logging
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm.auto import tqdm
+
 print = tqdm.write
 from transformers import AutoModelForCausalLM
 
@@ -16,9 +17,11 @@ device = None
 hostname = os.uname()[1]
 rank = os.getenv("RANK", None)
 
+
 def rank0_print(text):
     if rank is None or int(rank) == 0:
         print(text)
+
 
 def dir_check(dir_path: str, overwrite: bool = True):
     if overwrite:
@@ -39,6 +42,7 @@ def dir_check(dir_path: str, overwrite: bool = True):
             return dir_path
         os.makedirs(dir_path, exist_ok=True)
         return dir_path
+
 
 def send_feishu(msg):
     msg = str(msg)

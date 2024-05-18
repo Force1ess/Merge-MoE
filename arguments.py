@@ -7,9 +7,7 @@ import os
 
 @dataclass
 class TraningArguments(TrainingArguments):
-    model_name_or_path: Optional[str] = field(
-        default="./Mini-Mixtral-v0.2"
-    )
+    model_name_or_path: Optional[str] = field(default="./Mini-Mixtral-v0.2")
     model_max_length: int = field(
         default=2048,
         metadata={
@@ -37,6 +35,10 @@ class TraningArguments(TrainingArguments):
             "help": "The output directory where the model predictions and checkpoints will be written."
         },
     )
+    save_safetensors: bool = field(
+        default=False,
+        metadata={"help": "Whether to save safetensors."},
+    )
 
 
 @dataclass
@@ -46,7 +48,7 @@ class DataArguments:
         metadata={"help": "The name of the dataset to use (via the datasets library)."},
     )
     split: Optional[str] = field(
-        default="validation",
+        default="validation[:128]",
         metadata={
             "help": "The name of the training data set split to use (via the datasets library)."
         },
@@ -70,4 +72,8 @@ class DistillArguments:
     lora_dropout: float = field(default=0.0, metadata={"help": "Lora dropout."})
     merge_method: str = field(
         default="keep1", metadata={"help": "Merge method for MoE."}
+    )
+    intermediate_loss: str = field(
+        default="hidden_mse",
+        metadata={"help": "The loss function for intermediate loss."},
     )

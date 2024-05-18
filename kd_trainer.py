@@ -92,7 +92,7 @@ class KDTrainer(Trainer):
         Subclass and override for custom behavior.
         """
 
-        self.step+=1
+        self.step += 1
         total_loss = 0
 
         # Below is copied from transformers.Trainer.compute_loss() in transformer@2f12e40
@@ -170,9 +170,7 @@ class KDTrainer(Trainer):
             else:
                 inter_S = inters_S[feature][layer_S]
                 inter_T = inters_T[feature][layer_T]
-            intermediate_loss = match_loss(
-                inter_S, inter_T, mask=None
-            )  
+            intermediate_loss = match_loss(inter_S, inter_T, mask=None)
             total_inter_loss += intermediate_loss * match_weight
         total_loss += total_inter_loss * self.d_config.intermediate_loss_weight
         if (
