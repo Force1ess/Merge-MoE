@@ -5,7 +5,6 @@ from transformers.trainer import (
     TrainerCallback,
     EvalPrediction,
     TrainingArguments,
-    unwrap_model,
     nn,
     Trainer,
     Dataset,
@@ -71,19 +70,6 @@ class KDTrainer(Trainer):
             if isinstance(i, DEFAULT_PROGRESS_CALLBACK):
                 self.pbar_handler = i
                 break
-        for im in self.d_config.intermediate_matches:
-            if im.proj is not None:
-                projection = im.proj[0]
-                dim_in = im.proj[1]
-                dim_out = im.proj[2]
-                self.projs_group.append(im.proj[3])
-                self.projs.append(PROJ_MAP[projection](dim_in, dim_out))
-                self.projs[-1].to(self.t_config.device)
-            else:
-                self.projs.append(None)
-                self.projs_group.append(None)
-
-        # 目前来看模型的初始化应该在__wrap_model中即可
 
     def compute_loss(self, model, inputs, return_outputs=False):
         """
@@ -108,7 +94,7 @@ class KDTrainer(Trainer):
                 self._past = outputs[self.args.past_index]
 
             if labels is not None:
-                unwrapped_model = unwrap_model(model)
+                unwrapped_model = self.accelerator.unwrap_model(model)
                 if _is_peft_model(unwrapped_model):
                     model_name = unwrapped_model.base_model.model._get_name()
                 else:
@@ -174,11 +160,12 @@ class KDTrainer(Trainer):
             total_inter_loss += intermediate_loss * match_weight
         total_loss += total_inter_loss * self.d_config.intermediate_loss_weight
         if (
-            self.step % self.logging_steps == 0
+            self.step % (self.logging_steps *self.args.gradient_accumulation_steps ) == 0
             and self.pbar_handler is not None
             and self.pbar_handler.training_bar is not None
         ):
             self.pbar_handler.training_bar.write(
-                f"Step {self.step}: [0]Label Loss {loss * self.d_config.hard_label_weight} [1]Logits loss {total_kd_loss * self.d_config.kd_loss_weight} [2]Inter loss {total_inter_loss * self.d_config.intermediate_loss_weight}"
+                f"step {self.step}: [0]Label Loss {loss * self.d_config.hard_label_weight} [1]Logits loss {total_kd_loss * self.d_config.kd_loss_weight} [2]Inter loss {total_inter_loss * self.d_config.intermediate_loss_weight}"
             )
+            assert total_loss == loss * self.d_config.hard_label_weight + total_kd_loss * self.d_config.kd_loss_weight + total_inter_loss * self.d_config.intermediate_loss_weight
         return (total_loss, outputs) if return_outputs else total_loss

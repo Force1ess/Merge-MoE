@@ -67,7 +67,7 @@ class DistillArguments:
         default="configs/mini_distill_config.json",
         metadata={"help": "The path to the distillation config file."},
     )
-    lora_r: int = field(default=128, metadata={"help": "Lora R dimension."})
+    lora_r: int = field(default=32, metadata={"help": "Lora R dimension."})
     lora_alpha: float = field(default=16, metadata={"help": " Lora alpha."})
     lora_dropout: float = field(default=0.0, metadata={"help": "Lora dropout."})
     merge_method: str = field(

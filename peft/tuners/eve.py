@@ -9,9 +9,8 @@ import warnings
 
 from transformers.models.mixtral.modeling_mixtral import (
     MixtralBlockSparseTop2MLP,
-    MixtralSparseMoeBlock,
     MixtralDecoderLayer,
-    MixtralModel,
+    ACT2FN
 )
 import torch
 import torch.nn as nn
@@ -122,48 +121,40 @@ class EVELoraModel(LoraModel):
                 if not is_target_modules_in_base_model:
                     is_target_modules_in_base_model = True
                 parent, target, target_name = _get_submodules(self.model, key)
-                if isinstance(target, EVELoraExpert):
-                    raise ValueError(
-                        "Target module cannot be a LoRA layer. Please check the target modules and try again."
+
+                if isinstance(target, MixtralDecoderLayer):
+                    ffn_dim, hidden_dim = (
+                        target.block_sparse_moe.ffn_dim,
+                        target.block_sparse_moe.hidden_dim,
                     )
+
                 else:
-                    if loaded_in_8bit:
-                        raise NotImplementedError
-                    else:
-                        if isinstance(target, MixtralDecoderLayer):
-                            ffn_dim, hidden_dim = (
-                                target.block_sparse_moe.ffn_dim,
-                                target.block_sparse_moe.hidden_dim,
-                            )
-
-                        else:
-                            raise ValueError(
-                                f"Target module {target} is not supported. "
-                                f"Currently, only `MixtralDecoderLayer` is supported."
-                            )
-                        # lora layer 和 sparse layer只在这里被调用
-                        # TODO 两个layer
-                        # 实现merge等
-                        sparse_moe_module = EVEMixtralSparseBlock(
-                            adapter_name,
-                            target.block_sparse_moe.top_k,
-                            lora_args,
-                            ffn_dim,
-                            hidden_dim,
-                            target.block_sparse_moe.gate,
-                            target.block_sparse_moe.experts,
-                            merge_method,
-                        )
-                        new_module = EVEMixtralDecoderLayer(
-                            target.hidden_size,
-                            target.self_attn,
-                            target.block_sparse_moe,
-                            sparse_moe_module,
-                            target.input_layernorm,
-                            target.post_attention_layernorm,
-                        )
-
-                    self._replace_module(parent, target_name, new_module, target)
+                    raise ValueError(
+                        f"Target module {target} is not supported. "
+                        f"Currently, only `MixtralDecoderLayer` is supported."
+                    )
+                # lora layer 和 sparse layer只在这里被调用
+                # TODO 两个layer
+                # 实现merge等
+                sparse_moe_module = EVEMixtralSparseBlock(
+                    adapter_name,
+                    target.block_sparse_moe.top_k,
+                    lora_args,
+                    ffn_dim,
+                    hidden_dim,
+                    target.block_sparse_moe.gate,
+                    target.block_sparse_moe.experts,
+                    merge_method,
+                )
+                new_module = EVEMixtralDecoderLayer(
+                    target.hidden_size,
+                    target.self_attn,
+                    target.block_sparse_moe,
+                    sparse_moe_module,
+                    target.input_layernorm,
+                    target.post_attention_layernorm,
+                )
+                self._replace_module(parent, target_name, new_module, target)
         if not is_target_modules_in_base_model:
             raise ValueError(
                 f"Target modules {eve_config.target_modules} not found in the base model. "
@@ -197,7 +188,37 @@ class EVELoraModel(LoraModel):
         return peft_config
 
 
-# modulelist can only contain nn.module
+class EVELoraTop2MLP(nn.Module):
+    def __init__(
+        self,
+        ffn_dim: int,
+        hidden_dim: int,
+        act_fn: str,
+        dtype,
+        device,
+        lora_args: dict,
+    ):
+        nn.Module.__init__(self)
+        self.ffn_dim = ffn_dim
+        self.hidden_dim = hidden_dim
+        self.w1 = EVELoraExpert(
+            self.hidden_dim, self.ffn_dim, dtype=dtype, device=device, **lora_args
+        )
+        self.w2 = EVELoraExpert(
+            self.ffn_dim, self.hidden_dim, dtype=dtype, device=device, **lora_args
+        )
+        self.w3 = EVELoraExpert(
+            self.hidden_dim, self.ffn_dim, dtype=dtype, device=device, **lora_args
+        )
+        self.act_fn = ACT2FN[act_fn]
+
+    def forward(self, hidden_states):
+        current_hidden_states = self.act_fn(self.w1(hidden_states)) * self.w3(
+            hidden_states
+        )
+        current_hidden_states = self.w2(current_hidden_states)
+        return current_hidden_states
+
 class EVELoraExpert(nn.Module):
     def __init__(
         self,
@@ -213,12 +234,10 @@ class EVELoraExpert(nn.Module):
         nn.Module.__init__(self)
         self.in_features = in_features
         self.out_features = out_features
-
         self.dtype = dtype
         self.device = device
         self.update_layer(r, lora_alpha, lora_dropout, init_lora_weights)
         self.merged = False
-        # placehold for lora layer update
 
     def forward(self, x: torch.Tensor, **kwargs):
         previous_dtype = x.dtype
@@ -241,8 +260,18 @@ class EVELoraExpert(nn.Module):
         self.lora_dropout = lora_dropout_layer
         # Actual trainable parameters
         if r > 0:
-            self.lora_A = nn.Linear(self.in_features, r, bias=False, dtype=self.dtype)
-            self.lora_B = nn.Linear(r, self.out_features, bias=False, dtype=self.dtype)
+            self.lora_A = nn.Linear(
+                self.in_features,
+                r,
+                dtype=self.dtype,
+                device=self.device,
+            )
+            self.lora_B = nn.Linear(
+                r,
+                self.out_features,
+                dtype=self.dtype,
+                device=self.device,
+            )
             self.scaling = lora_alpha / r
         if init_lora_weights:
             self.reset_lora_parameters()
@@ -266,7 +295,7 @@ class EVEMixtralSparseBlock(nn.Module):
         self,
         adapter_name: str,
         num_experts_per_tok: int,
-        eve_config: dict,
+        lora_args: dict,
         ffn_dim: int,
         hidden_dim: int,
         router: nn.Linear,
@@ -285,18 +314,18 @@ class EVEMixtralSparseBlock(nn.Module):
         dtype = experts[0].w1.weight.dtype
         self.lora_experts = nn.ModuleList(
             [
-                EVELoraExpert(
+                EVELoraTop2MLP(
+                    self.ffn_dim,
                     self.hidden_dim,
-                    self.hidden_dim,
+                    'silu',
                     dtype,
                     device,
-                    **eve_config,
+                    lora_args,
                 )
                 for _ in range(self.num_experts)
             ]
         )
-
-        self.expert = merge_method(experts, self.lora_experts)
+        self.share_expert = merge_method(experts, self.lora_experts, lora_args)
         self.merged = False
         # TODO soft router for future test
         self.expert_weight = [0] * self.num_experts
@@ -356,7 +385,7 @@ class EVEMixtralSparseBlock(nn.Module):
             current_state = hidden_states[None, top_x_list].reshape(-1, hidden_dim)
             lora_expert = self.lora_experts[expert_idx]
             current_hidden_states = (
-                self.expert(current_state) + lora_expert.forward(current_state)
+                self.share_expert(current_state) + lora_expert.forward(current_state)
             ) * routing_weights[top_x_list, idx_list, None]
             # However `index_add_` only support torch tensors for indexing so we'll use
             # the `top_x` tensor here.
@@ -461,13 +490,3 @@ class EVEMixtralDecoderLayer(nn.Module):
             outputs += (router_logits,)
 
         return outputs
-
-
-from transformers.models.mixtral.modeling_mixtral import (
-    DynamicCache,
-    logger,
-    Cache,
-    _prepare_4d_causal_attention_mask,
-    _prepare_4d_causal_attention_mask_for_sdpa,
-    MoeModelOutputWithPast,
-)
