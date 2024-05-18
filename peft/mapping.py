@@ -29,7 +29,7 @@ from .tuners import (
     PromptEncoderConfig,
     PromptTuningConfig,
     MMOELoraConfigS,
-    EVELoraConfig,
+    EVEConfig,
 )
 from .utils import PromptLearningConfig
 
@@ -50,7 +50,7 @@ PEFT_TYPE_TO_CONFIG_MAPPING = {
     "LORA": LoraConfig,
     "ADALORA": AdaLoraConfig,
     "MMOELORAS": MMOELoraConfigS,
-    "EVELORA": EVELoraConfig,
+    "EVELORA": EVEConfig,
 }
 
 

@@ -4,13 +4,13 @@ import importlib
 import math
 from typing import Callable, List, Optional, Tuple, Union
 from dataclasses import dataclass, field
-from ..merge_methods import MERGE_MAP
+from ..merge_methods import init_experts
 import warnings
 
 from transformers.models.mixtral.modeling_mixtral import (
     MixtralBlockSparseTop2MLP,
     MixtralDecoderLayer,
-    ACT2FN
+    ACT2FN,
 )
 import torch
 import torch.nn as nn
@@ -34,7 +34,7 @@ def is_bnb_available():
 
 
 @dataclass
-class EVELoraConfig(PeftConfig):
+class EVEConfig(PeftConfig):
     """
     This is the configuration class to store the configuration of a [`~peft.MMOELora`]
     """
@@ -43,8 +43,11 @@ class EVELoraConfig(PeftConfig):
     r: int = field(default=8, metadata={"help": "Lora attention dimension"})
     lora_alpha: int = field(default=None, metadata={"help": "Lora alpha"})
     lora_dropout: float = field(default=None, metadata={"help": "Lora dropout"})
-    merge_method: str = field(
-        default=None, metadata={"help": "Merge method for MixtralSparseMoeBlock"}
+    expert_merge: str = field(
+        default="mean", metadata={"help": "Merge method for share expert use mergekit"}
+    )
+    expert_init: str = field(
+        default=None, metadata={"help": "eve expert initialization method"}
     )
     target_modules: list = field(
         default=None, metadata={"help": "Target modules for EVELora"}
@@ -63,7 +66,7 @@ class EVELoraConfig(PeftConfig):
         self.peft_type = PeftType.EVELORA
 
 
-class EVELoraModel(LoraModel):
+class EVEModel(LoraModel):
     """
     Create MMOELoRA (MMOE based LoRA) model from a pretrained transformers model.
     """
@@ -113,7 +116,6 @@ class EVELoraModel(LoraModel):
             "lora_dropout": eve_config.lora_dropout,
             "init_lora_weights": eve_config.init_lora_weights,
         }
-        merge_method = MERGE_MAP[eve_config.merge_method]
         key_list = [key for key, _ in self.model.named_modules()]
         for key in key_list:
             target_module_found = str.isdigit(key.replace("model.layers.", ""))
@@ -144,7 +146,13 @@ class EVELoraModel(LoraModel):
                     hidden_dim,
                     target.block_sparse_moe.gate,
                     target.block_sparse_moe.experts,
-                    merge_method,
+                )
+                sparse_moe_module.share_expert = init_experts(
+                    target.block_sparse_moe.experts,
+                    sparse_moe_module.lora_experts,
+                    lora_args,
+                    eve_config.expert_merge,
+                    eve_config.expert_init,
                 )
                 new_module = EVEMixtralDecoderLayer(
                     target.hidden_size,
@@ -188,7 +196,7 @@ class EVELoraModel(LoraModel):
         return peft_config
 
 
-class EVELoraTop2MLP(nn.Module):
+class EVETop2MLP(nn.Module):
     def __init__(
         self,
         ffn_dim: int,
@@ -201,13 +209,13 @@ class EVELoraTop2MLP(nn.Module):
         nn.Module.__init__(self)
         self.ffn_dim = ffn_dim
         self.hidden_dim = hidden_dim
-        self.w1 = EVELoraExpert(
+        self.w1 = EVELinear(
             self.hidden_dim, self.ffn_dim, dtype=dtype, device=device, **lora_args
         )
-        self.w2 = EVELoraExpert(
+        self.w2 = EVELinear(
             self.ffn_dim, self.hidden_dim, dtype=dtype, device=device, **lora_args
         )
-        self.w3 = EVELoraExpert(
+        self.w3 = EVELinear(
             self.hidden_dim, self.ffn_dim, dtype=dtype, device=device, **lora_args
         )
         self.act_fn = ACT2FN[act_fn]
@@ -219,7 +227,8 @@ class EVELoraTop2MLP(nn.Module):
         current_hidden_states = self.w2(current_hidden_states)
         return current_hidden_states
 
-class EVELoraExpert(nn.Module):
+
+class EVELinear(nn.Module):
     def __init__(
         self,
         in_features: int,
@@ -300,9 +309,6 @@ class EVEMixtralSparseBlock(nn.Module):
         hidden_dim: int,
         router: nn.Linear,
         experts: nn.ModuleList,
-        merge_method: Callable[
-            [nn.ModuleList, nn.ModuleList], MixtralBlockSparseTop2MLP
-        ],
     ):
         super().__init__()
         self.top_k = num_experts_per_tok
@@ -314,10 +320,10 @@ class EVEMixtralSparseBlock(nn.Module):
         dtype = experts[0].w1.weight.dtype
         self.lora_experts = nn.ModuleList(
             [
-                EVELoraTop2MLP(
+                EVETop2MLP(
                     self.ffn_dim,
                     self.hidden_dim,
-                    'silu',
+                    "silu",
                     dtype,
                     device,
                     lora_args,
@@ -325,7 +331,7 @@ class EVEMixtralSparseBlock(nn.Module):
                 for _ in range(self.num_experts)
             ]
         )
-        self.share_expert = merge_method(experts, self.lora_experts, lora_args)
+        
         self.merged = False
         # TODO soft router for future test
         self.expert_weight = [0] * self.num_experts

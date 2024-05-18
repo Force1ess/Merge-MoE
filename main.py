@@ -7,7 +7,7 @@ from arguments import (
     DataArguments,
     DistillArguments,
 )
-from peft import get_peft_model, EVELoraConfig, TaskType
+from peft import get_peft_model, EVEConfig, TaskType
 from textbrewer import DistillationConfig
 import torch
 import transformers
@@ -51,7 +51,7 @@ def main():
         remove_columns=dataset.column_names,
     )
 
-    eve_config = EVELoraConfig(
+    eve_config = EVEConfig(
         task_type=TaskType.CAUSAL_LM,
         merge_method=distill_args.merge_method,
         r=distill_args.lora_r,

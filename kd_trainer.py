@@ -17,7 +17,6 @@ from textbrewer import (
     KD_LOSS_MAP,
     MATCH_LOSS_MAP,
     FEATURES,
-    PROJ_MAP,
 )
 from transformers import DataCollatorForLanguageModeling
 from utils import rank0_print
@@ -165,7 +164,6 @@ class KDTrainer(Trainer):
             and self.pbar_handler.training_bar is not None
         ):
             self.pbar_handler.training_bar.write(
-                f"step {self.step}: [0]Label Loss {loss * self.d_config.hard_label_weight} [1]Logits loss {total_kd_loss * self.d_config.kd_loss_weight} [2]Inter loss {total_inter_loss * self.d_config.intermediate_loss_weight}"
+                f"step {self.step}: [0]label Loss {loss * self.d_config.hard_label_weight} [1]logits loss {total_kd_loss * self.d_config.kd_loss_weight} [2]inter loss {total_inter_loss * self.d_config.intermediate_loss_weight}"
             )
-            assert total_loss == loss * self.d_config.hard_label_weight + total_kd_loss * self.d_config.kd_loss_weight + total_inter_loss * self.d_config.intermediate_loss_weight
         return (total_loss, outputs) if return_outputs else total_loss

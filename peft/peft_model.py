@@ -47,7 +47,7 @@ from .tuners import (
     PromptEmbedding,
     PromptEncoder,
     MMOELoraModelS,
-    EVELoraModel,
+    EVEModel,
 )
 from .utils import (
     TRANSFORMERS_MODELS_TO_PREFIX_TUNING_POSTPROCESS_MAPPING,
@@ -73,7 +73,7 @@ PEFT_TYPE_TO_MODEL_MAPPING = {
     PeftType.ADALORA: AdaLoraModel,
     PeftType.ADAPTION_PROMPT: AdaptionPromptModel,
     PeftType.MMOELORAS: MMOELoraModelS,
-    PeftType.EVELORA: EVELoraModel,  # 主体只在这里被调用
+    PeftType.EVELORA: EVEModel,  # 主体只在这里被调用
 }
 
 

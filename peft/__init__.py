@@ -50,8 +50,8 @@ from .tuners import (
     PromptTuningInit,
     MMOELoraConfigS,
     MMOELoraModelS,
-    EVELoraConfig,
-    EVELoraModel,
+    EVEConfig,
+    EVEModel,
 )
 from .utils import (
     TRANSFORMERS_MODELS_TO_PREFIX_TUNING_POSTPROCESS_MAPPING,

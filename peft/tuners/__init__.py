@@ -28,4 +28,4 @@ from .p_tuning import (
 from .prefix_tuning import PrefixEncoder, PrefixTuningConfig
 from .prompt_tuning import PromptEmbedding, PromptTuningConfig, PromptTuningInit
 from .mmoeloraS import MMOELoraConfigS, MMOELoraModelS
-from .eve import EVELoraConfig, EVELoraModel
+from .eve import EVEConfig, EVEModel
