@@ -1,4 +1,3 @@
-from heapq import merge
 from torch import nn
 from copy import deepcopy
 import mergekit
@@ -12,10 +11,10 @@ def init_experts(
     expert_merge: str,
     expert_init: str,
 ):
-    merge_func = getattr(mergekit, expert_merge, lambda x,y,_:x[0])
-    init_func = INIT_MAP.get(expert_init, lambda x:x)
-    merge_func(experts, lora_experts, lora_args)
+    merge_func = getattr(mergekit, expert_merge, lambda x,y,z:x[0])
+    init_func = INIT_MAP.get(expert_init, lambda x,y,z:None)
     init_func(experts, lora_experts, lora_args)
+    return merge_func(experts, lora_experts, lora_args)
 
 
 def keep1(experts: nn.ModuleList, lora_experts: nn.ModuleList, lora_args: dict):

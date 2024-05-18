@@ -64,7 +64,7 @@ class DataArguments:
 @dataclass
 class DistillArguments:
     distill_config: str = field(
-        default="configs/mini_distill_config.json",
+        default="configs/all_kd_config.json",
         metadata={"help": "The path to the distillation config file."},
     )
     lora_r: int = field(default=32, metadata={"help": "Lora R dimension."})
