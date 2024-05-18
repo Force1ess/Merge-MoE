@@ -70,8 +70,11 @@ class DistillArguments:
     lora_r: int = field(default=32, metadata={"help": "Lora R dimension."})
     lora_alpha: float = field(default=16, metadata={"help": " Lora alpha."})
     lora_dropout: float = field(default=0.0, metadata={"help": "Lora dropout."})
-    merge_method: str = field(
+    expert_merge: str = field(
         default="keep1", metadata={"help": "Merge method for MoE."}
+    )
+    expert_init: str = field(
+        default=None, metadata={"help": "Initialization method for MoE."}
     )
     intermediate_loss: str = field(
         default="hidden_mse",

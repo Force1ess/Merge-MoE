@@ -53,7 +53,8 @@ def main():
 
     eve_config = EVEConfig(
         task_type=TaskType.CAUSAL_LM,
-        merge_method=distill_args.merge_method,
+        expert_merge=distill_args.expert_merge,
+        expert_init=distill_args.expert_init,
         r=distill_args.lora_r,
         lora_alpha=distill_args.lora_alpha,
         lora_dropout=distill_args.lora_dropout,
