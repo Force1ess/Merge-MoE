@@ -3,7 +3,6 @@ echo "CUDA_DEVICES_COUNT: $CUDA_DEVICES_COUNT"
 export PYTHONPATH=.
 while true; do
     random_port=$(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
-    # 检查端口是否被占用（使用 lsof 或 netstat）
     if ! lsof -i:$random_port &> /dev/null; then
         break
     fi
