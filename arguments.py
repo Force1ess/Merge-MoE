@@ -7,7 +7,7 @@ import os
 
 @dataclass
 class TraningArguments(TrainingArguments):
-    model_name_or_path: Optional[str] = field(default="./Mini-Mixtral-v0.2")
+    model_name_or_path: Optional[str] = field(default="./smol_llama-4x220M-MoE/")
     model_max_length: int = field(
         default=2048,
         metadata={

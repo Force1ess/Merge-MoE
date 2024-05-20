@@ -8,9 +8,11 @@ from ..merge_methods import init_experts
 import warnings
 
 from transformers.models.mixtral.modeling_mixtral import (
-    MixtralBlockSparseTop2MLP,
     MixtralDecoderLayer,
     ACT2FN,
+)
+from transformers.models.qwen2_moe.modeling_qwen2_moe import (
+    Qwen2MoeDecoderLayer
 )
 import torch
 import torch.nn as nn
@@ -129,6 +131,12 @@ class EVEModel(LoraModel):
                         target.block_sparse_moe.ffn_dim,
                         target.block_sparse_moe.hidden_dim,
                     )
+                
+                if isinstance(target, Qwen2MoeDecoderLayer):
+                    ffn_dim, hidden_dim = (
+                        target.block_sparse_moe.ffn_dim,
+                        target.block_sparse_moe.hidden_dim,
+                    ) 
 
                 else:
                     raise ValueError(
