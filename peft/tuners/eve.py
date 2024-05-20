@@ -132,7 +132,7 @@ class EVEModel(LoraModel):
                         target.block_sparse_moe.hidden_dim,
                     )
                 
-                if isinstance(target, Qwen2MoeDecoderLayer):
+                elif isinstance(target, Qwen2MoeDecoderLayer):
                     ffn_dim, hidden_dim = (
                         target.block_sparse_moe.ffn_dim,
                         target.block_sparse_moe.hidden_dim,
