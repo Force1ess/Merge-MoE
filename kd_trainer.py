@@ -7,6 +7,7 @@ from transformers.trainer import (
     TrainingArguments,
     nn,
     Trainer,
+    ParallelMode,
     Dataset,
     MODEL_FOR_CAUSAL_LM_MAPPING_NAMES,
     _is_peft_model,
@@ -116,10 +117,11 @@ class KDTrainer(Trainer):
         results_S = outputs
         # KD loss copied from textbrewer general distiller without custom match and loss dict
         total_kd_loss = 0
-        if self.is_deepspeed_enabled:
+        if self.args.parallel_mode == ParallelMode.DISTRIBUTED:
             results_T = {
                 "hidden_states": [
-                    l.block_sparse_hidden_states.detach() for l in model.module.model.model.layers
+                    l.block_sparse_hidden_states.detach()
+                    for l in model.module.model.model.layers
                 ]
             }
             results_T["hidden_states"].append(
@@ -131,7 +133,8 @@ class KDTrainer(Trainer):
         else:
             results_T = {
                 "hidden_states": [
-                    l.block_sparse_hidden_states.detach() for l in model.model.model.layers
+                    l.block_sparse_hidden_states.detach()
+                    for l in model.model.model.layers
                 ]
             }
             results_T["hidden_states"].append(
@@ -170,7 +173,8 @@ class KDTrainer(Trainer):
             total_inter_loss += intermediate_loss * match_weight
         total_loss += total_inter_loss * self.d_config.intermediate_loss_weight
         if (
-            self.step % (self.logging_steps *self.args.gradient_accumulation_steps ) == 0
+            self.step % (self.logging_steps * self.args.gradient_accumulation_steps)
+            == 0
             and self.pbar_handler is not None
             and self.pbar_handler.training_bar is not None
         ):

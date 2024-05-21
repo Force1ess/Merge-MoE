@@ -17,7 +17,6 @@ torchrun --master_port $random_port --nproc_per_node $CUDA_DEVICES_COUNT main.py
     --logging_steps 50 \
     --split "train" \
     --save_strategy "epoch" \
-    --report_to "wandb" \
     --warmup_ratio 0.03 \
     --lr_scheduler_type "cosine" \
     --gradient_accumulation_steps 8\

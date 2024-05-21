@@ -70,6 +70,11 @@ def main():
         config.num_hidden_layers = 2
         model = AutoModelForCausalLM.from_config(config)
 
+    if data_args.split == "train":
+        training_args.report_to = "wandb"
+    else:
+        training_args.report_to = []
+
     eve_model = get_peft_model(
         model,
         eve_config,
@@ -111,10 +116,8 @@ def main():
         tokenizer=tokenizer,
     )
     trainer.train()
-    if os.environ.get("LOCAL_RANK", "0") == "0" and data_args.split=='train':
-        send_feishu(
-            f"{socket.gethostname()}: 训练完成，模型保存在{training_args.output_dir}"
-        )
+    if os.environ.get("LOCAL_RANK", "0") == "0" and data_args.split == "train":
+        send_feishu(f"{socket.gethostname()}: 训练完成，模型保存在{training_args.output_dir}")
 
 
 if __name__ == "__main__":
