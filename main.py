@@ -111,7 +111,7 @@ def main():
         tokenizer=tokenizer,
     )
     trainer.train()
-    if os.environ.get("LOCAL_RANK", "0") == "0":
+    if os.environ.get("LOCAL_RANK", "0") == "0" and data_args.split=='train':
         send_feishu(
             f"{socket.gethostname()}: 训练完成，模型保存在{training_args.output_dir}"
         )
