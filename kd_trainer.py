@@ -116,17 +116,28 @@ class KDTrainer(Trainer):
         results_S = outputs
         # KD loss copied from textbrewer general distiller without custom match and loss dict
         total_kd_loss = 0
-        results_T = {
-            "hidden_states": [
-                l.block_sparse_hidden_states.detach() for l in model.module.model.model.layers
-            ]
-        }
-        results_T["hidden_states"].append(
-            model.module.model.model.norm(results_T["hidden_states"][-1])
-        )
-        results_T["logits"] = model.module.lm_head(
-            results_T["hidden_states"][-1]
-        ).float()
+        if self.is_deepspeed_enabled:
+            results_T = {
+                "hidden_states": [
+                    l.block_sparse_hidden_states.detach() for l in model.module.model.model.layers
+                ]
+            }
+            results_T["hidden_states"].append(
+                model.module.model.model.norm(results_T["hidden_states"][-1])
+            )
+            results_T["logits"] = model.module.lm_head(
+                results_T["hidden_states"][-1]
+            ).float()
+        else:
+            results_T = {
+                "hidden_states": [
+                    l.block_sparse_hidden_states.detach() for l in model.model.model.layers
+                ]
+            }
+            results_T["hidden_states"].append(
+                model.model.model.norm(results_T["hidden_states"][-1])
+            )
+            results_T["logits"] = model.lm_head(results_T["hidden_states"][-1]).float()
 
         for l_T, l_S in zip(results_T["logits"], results_S.logits):
             if self.d_config.temperature_scheduler is not None:
