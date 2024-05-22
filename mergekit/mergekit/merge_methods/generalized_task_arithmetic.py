@@ -67,7 +67,6 @@ class GeneralizedTaskArithmeticMerge(MergeMethod, BaseModel, frozen=True):
 
     def make_task(
         self,
-        output_weight: WeightInfo,
         tensors: GatherTensors,
         base_model: Optional[ModelReference],
         parameters: ImmutableMap[str, Any],
@@ -81,16 +80,14 @@ class GeneralizedTaskArithmeticMerge(MergeMethod, BaseModel, frozen=True):
             int8_mask=parameters["int8_mask"],
             normalize=parameters["normalize"],
             rescale=parameters["rescale"],
-            weight_info=output_weight,
         )
 
 
 class GTATask(Task[torch.Tensor]):
     method: GeneralizedTaskArithmeticMerge
-    tensors: GatherTensors
-    base_model: ModelReference
-    weight_info: WeightInfo
-    tensor_parameters: ImmutableMap[ModelReference, Any]
+    tensors: dict
+    base_model: int
+    tensor_parameters: dict
     int8_mask: bool
     normalize: bool
     rescale: bool
@@ -108,10 +105,9 @@ class GTATask(Task[torch.Tensor]):
     ) -> torch.Tensor:
         # collect task vectors
         tvs, base = get_task_vectors(
-            self.weight_info,
             self.base_model,
             tensors,
-            tensor_parameters=self.tensor_parameters.data,
+            tensor_parameters=self.tensor_parameters,
         )
         if not tvs:
             return base
@@ -166,16 +162,12 @@ class GTATask(Task[torch.Tensor]):
 
 
 def get_task_vectors(
-    weight_info: WeightInfo,
     base_model: ModelReference,
     tensors: ImmutableMap[ModelReference, torch.Tensor],
     tensor_parameters: ImmutableMap[ModelReference, ImmutableMap[str, Any]],
 ) -> Tuple[List[Dict[str, Any]], torch.Tensor]:
     keys = list(tensors.keys())
     base = tensors[base_model]
-
-    parameter_name = weight_info.name
-
     res = []
     for model in keys:
         if model == base_model:
@@ -183,14 +175,7 @@ def get_task_vectors(
 
         x = tensors[model].to(base.dtype)
         if x.shape != base.shape:
-            if weight_info.is_embed:
-                x = x[: base.shape[0], : base.shape[1]]
-                logging.warning(f"Using submatrix of {model}:{parameter_name}")
-            else:
-                logging.warning(
-                    f"skipping {model}:{parameter_name} due to size mismatch"
-                )
-                continue
+            raise NotImplementedError("Model shapes must match")
 
         delta = x - base
         del x
