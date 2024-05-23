@@ -27,6 +27,7 @@ def main():
     training_args, data_args, distill_args = transformers.HfArgumentParser(
         (TraningArguments, DataArguments, DistillArguments)
     ).parse_args_into_dataclasses()
+
     tokenizer = AutoTokenizer.from_pretrained(
         training_args.model_name_or_path,
         model_max_length=training_args.model_max_length,
@@ -71,7 +72,7 @@ def main():
         model = AutoModelForCausalLM.from_config(config)
 
     if data_args.split == "train":
-        training_args.report_to = "wandb"
+        training_args.report_to = ["wandb"]
     else:
         training_args.report_to = []
 
@@ -107,6 +108,7 @@ def main():
             ]
         }
     )
+
     trainer = KDTrainer(
         eve_model,
         distill_config,
@@ -115,6 +117,10 @@ def main():
         dataset,
         tokenizer=tokenizer,
     )
+    if os.environ.get("LOCAL_RANK", "0") == "0" and data_args.split == "train":
+        print(
+            f"total batch_size: {training_args.per_device_train_batch_size*torch.cuda.device_count()*training_args.gradient_accumulation_steps}"
+        )
     trainer.train()
     if os.environ.get("LOCAL_RANK", "0") == "0" and data_args.split == "train":
         send_feishu(f"{socket.gethostname()}: 训练完成，模型保存在{training_args.output_dir}")

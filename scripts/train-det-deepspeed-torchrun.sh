@@ -8,15 +8,10 @@ while true; do
     fi
 done
 torchrun --master_port $random_port --nproc_per_node $CUDA_DEVICES_COUNT main.py \
-    --num_train_epochs 1 \
     --split "train[:128]"\
     --per_device_train_batch_size 8\
-    --model_max_length 4096\
     --distill_config $1\
-    --logging_steps 5\
     --attn_implementation "flash_attention_2" \
-    --save_strategy "epoch" \
-    --save_only_model True \
     --bf16 True \
     --tf32 True
     #--deepspeed $2

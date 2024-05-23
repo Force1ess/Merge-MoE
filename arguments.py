@@ -7,9 +7,9 @@ import os
 
 @dataclass
 class TraningArguments(TrainingArguments):
-    model_name_or_path: Optional[str] = field(default="./smol_llama-4x220M-MoE/")
+    model_name_or_path: Optional[str] = field(default="./Qwen1.5-MoE-A2.7B/")
     model_max_length: int = field(
-        default=2048,
+        default=4096,
         metadata={
             "help": "Maximum sequence length. Sequences will be right padded (and possibly truncated)."
         },
@@ -38,6 +38,22 @@ class TraningArguments(TrainingArguments):
     save_safetensors: bool = field(
         default=False,
         metadata={"help": "Whether to save safetensors."},
+    )
+    logging_steps: int = field(
+        default=5,
+        metadata={"help": "Log every X updates steps."},
+    )
+    save_steps: int = field(
+        default=500,
+        metadata={"help": "Save checkpoint every X updates steps."},
+    )
+    num_train_epochs: int = field(
+        default=1,
+        metadata={"help": "Total number of training epochs to perform."},
+    )
+    learning_rate: float = field(
+        default=1e-6,
+        metadata={"help": "The initial learning rate for Adam."},
     )
 
 
