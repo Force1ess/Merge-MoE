@@ -87,7 +87,7 @@ def main():
         f"{training_args.model_name_or_path}-bs{training_args.per_device_train_batch_size*torch.cuda.device_count()*training_args.gradient_accumulation_steps}-{Path(distill_args.distill_config).stem}".replace(
             "/", "-"
         )
-        + datetime.now().strftime("%m-%d"),
+        + datetime.now().strftime("%m-%d-%H-%M-%S"),
     )
     dir_check(training_args.output_dir)
     distill_config: dict = json.load(open(distill_args.distill_config, "r"))
