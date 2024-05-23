@@ -120,7 +120,7 @@ class KDTrainer(Trainer):
         if self.args.parallel_mode == ParallelMode.DISTRIBUTED:
             results_T = {
                 "hidden_states": [
-                    l.block_sparse_hidden_states.detach()
+                    l.sparse_hidden_states.detach()
                     for l in model.module.model.model.layers
                 ]
             }
@@ -133,8 +133,7 @@ class KDTrainer(Trainer):
         else:
             results_T = {
                 "hidden_states": [
-                    l.block_sparse_hidden_states.detach()
-                    for l in model.model.model.layers
+                    l.sparse_hidden_states.detach() for l in model.model.model.layers
                 ]
             }
             results_T["hidden_states"].append(

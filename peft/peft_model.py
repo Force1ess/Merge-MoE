@@ -73,7 +73,7 @@ PEFT_TYPE_TO_MODEL_MAPPING = {
     PeftType.ADALORA: AdaLoraModel,
     PeftType.ADAPTION_PROMPT: AdaptionPromptModel,
     PeftType.MMOELORAS: MMOELoraModelS,
-    PeftType.EVELORA: EVEModel,  # 主体只在这里被调用
+    PeftType.EVE: EVEModel,  # 主体只在这里被调用
 }
 
 

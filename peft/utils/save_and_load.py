@@ -34,7 +34,7 @@ def get_peft_model_state_dict(model, state_dict=None, adapter_name="default"):
         PeftType.LORA,
         PeftType.ADALORA,
         PeftType.MMOELORAS,
-        PeftType.EVELORA,
+        PeftType.EVE,
     ):
         # to_return = lora_state_dict(model, bias=model.peft_config.bias)
         # adapted from `https://github.com/microsoft/LoRA/blob/main/loralib/utils.py`
@@ -128,7 +128,7 @@ def set_peft_model_state_dict(model, peft_model_state_dict, adapter_name="defaul
         PeftType.LORA,
         PeftType.ADALORA,
         PeftType.MMOELORAS,
-        PeftType.EVELORA,
+        PeftType.EVE,
     ):
         peft_model_state_dict = {}
         for k, v in state_dict.items():

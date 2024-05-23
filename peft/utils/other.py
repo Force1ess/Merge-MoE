@@ -18,6 +18,77 @@ import copy
 import torch
 
 
+def dequantize_module_weight(module: torch.nn.Module) -> torch.nn.Parameter:
+    """
+    Helper function to dequantize a quantized weight.
+
+    This function should be extended if more quantization schemes are added to the library.
+
+    If the weight is not quantized, it will be returned as is.
+    """
+    if hasattr(module, "W_q"):  # For handling HQQ quantized weight
+        weight = module.dequantize()
+        return weight
+
+    weight = module.weight
+    if not isinstance(weight, torch.nn.Parameter):
+        raise TypeError(
+            f"Input weight should be of type nn.Parameter, got {type(weight)} instead"
+        )
+
+    cls_name = weight.__class__.__name__
+    if cls_name not in ("Params4bit", "Int8Params"):
+        return weight
+
+    quant_state = getattr(module, "state", None)
+    device = weight.device
+    is_cpu = device.type == torch.device("cpu").type
+    weight = dequantize_bnb_weight(weight, state=quant_state)  # no-op if not bnb
+    if is_cpu:
+        # dequantize_bnb_weight for 8bit moves the device in-place, thus we need to move it back to CPU if necessary
+        module.weight = module.weight.to(device)
+    return weight
+
+
+def dequantize_bnb_weight(weight: torch.nn.Parameter, state=None):
+    """Helper function to dequantize 4bit or 8bit bnb weights.
+
+    Since dequantization is not supported on CPU, the weight will be temporarily moved to CUDA if necessary.
+    """
+    import bitsandbytes as bnb
+
+    # BNB requires CUDA weights
+    device = weight.device
+    is_cpu = device.type == torch.device("cpu").type
+    if is_cpu:
+        weight = weight.to(torch.device("cuda"))
+
+    cls_name = weight.__class__.__name__
+    if cls_name == "Params4bit":
+        dequantized = bnb.functional.dequantize_4bit(weight.data, weight.quant_state)
+        if is_cpu:
+            dequantized = dequantized.to(device)
+        return dequantized
+
+    if state.SCB is None:
+        state.SCB = weight.SCB
+
+    im = torch.eye(weight.data.shape[-1]).contiguous().half().to(weight.device)
+    im, imt, SCim, SCimt, coo_tensorim = bnb.functional.double_quant(im)
+    im, Sim = bnb.functional.transform(im, "col32")
+    if state.CxB is None:
+        state.CxB, state.SB = bnb.functional.transform(
+            weight.data, to_order=state.formatB
+        )
+    out32, Sout32 = bnb.functional.igemmlt(im, state.CxB, Sim, state.SB)
+    dequantized = bnb.functional.mm_dequant(
+        out32, Sout32, SCim, state.SCB, bias=None
+    ).t()
+    if is_cpu:
+        dequantized = dequantized.to(device)
+    return dequantized
+
+
 # needed for prefix-tuning of bloom model
 def bloom_model_postprocess_past_key_value(past_key_values):
     past_key_values = torch.cat(past_key_values)
@@ -233,7 +304,12 @@ def fsdp_auto_wrap_policy(model):
 
 
 def transpose(weight, fan_in_fan_out):
-    return weight.T if fan_in_fan_out else weight
+    if not fan_in_fan_out:
+        return weight
+
+    if isinstance(weight, torch.nn.Parameter):
+        return torch.nn.Parameter(weight.T)
+    return weight.T
 
 
 TRANSFORMERS_MODELS_TO_LORA_TARGET_MODULES_MAPPING = {
@@ -282,6 +358,7 @@ TRANSFORMERS_MODELS_TO_MMOELORAS_TARGET_MODULES_MAPPING = (
 )
 TRANSFORMERS_MODELS_TO_EVELORA_TARGET_MODULES_MAPPING = {
     "mixtral": ["decoder_layer"],
+    "qwen2_moe":["decoder_layer"]
 }
 TRANSFORMERS_MODELS_TO_PREFIX_TUNING_POSTPROCESS_MAPPING = {
     "bloom": bloom_model_postprocess_past_key_value,

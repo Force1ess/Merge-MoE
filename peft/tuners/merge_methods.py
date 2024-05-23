@@ -11,26 +11,36 @@ from mergekit.mergekit.merge_methods.generalized_task_arithmetic import (
 
 def init_experts(
     experts: nn.ModuleList,
-    lora_experts: nn.ModuleList,
+    eve_experts: nn.ModuleList,
     lora_args: dict,
-    expert_merge: str,
+    expert_keys: list[str],
     expert_init: str,
+    expert_merge: str = None,
 ):
-    merge_func = MERGE_MAP.get(expert_merge, keep_one)
-    init_func = INIT_MAP.get(expert_init, lambda x, y, z: None)
-    init_func(experts, lora_experts, lora_args)
+
+    init_func = INIT_MAP.get(expert_init, None)
+    if init_func is not None:
+        expert = getattr(eve_experts[0], expert_keys[0])
+        prev_shape = (expert.lora_A.weight.shape, expert.lora_B.weight.shape)
+        init_func(experts, eve_experts, lora_args, expert_keys)
+        after_shape = (expert.lora_A.weight.shape, expert.lora_B.weight.shape)
+        assert prev_shape == after_shape, "The expert initialization failed: unmatched shapes"
+
+    if expert_merge is None:
+        return
+    merge_func = MERGE_MAP.get(expert_merge, expert_keys)
     if isinstance(merge_func, GeneralizedTaskArithmeticMerge):
         merge_func = partial(TaskVectorAdaptation, task=merge_func)
     return merge_func(experts)
 
 
-def keep_one(experts: nn.ModuleList):
+def keep_one(experts: nn.ModuleList, *args, **kwargs):
     share_expert = deepcopy(experts[0])
     assert id(share_expert) != id(experts[0])
     return share_expert
 
 
-def svd_decomposition(experts, lora_experts, lora_args: dict):
+def svd_decomposition(experts, eve_experts, lora_args: dict, expert_keys:list[str]):
     """
     Decompose a 2D matrix into low-rank matrices A and B using SVD.a
 
@@ -39,9 +49,10 @@ def svd_decomposition(experts, lora_experts, lora_args: dict):
     :return: A tuple of tensors (A, B)
     """
     expert_num = len(experts)
+    eve_keys = ['w1','w2','w3']
     for i in range(expert_num):
-        for key in ["w1", "w2", "w3"]:
-            weight = getattr(experts[i], key).weight.data
+        for key_id in range(3):
+            weight = getattr(experts[i], expert_keys[key_id]).weight.data
             lora_rank = lora_args["r"]
             if weight.dim() != 2:
                 raise ValueError(
@@ -54,15 +65,15 @@ def svd_decomposition(experts, lora_experts, lora_args: dict):
             # Truncated matrices
             A = Vh[:lora_rank, :]
             B = U[:, :lora_rank] @ torch.diag(S[:lora_rank])
-            lora = getattr(lora_experts[i], key)
+            lora = getattr(eve_experts[i], eve_keys[key_id])
             lora.lora_A.weight.data = A
             lora.lora_B.weight.data = B
 
 
-def average_merge(experts: nn.ModuleList):
+def average_merge(experts: nn.ModuleList, expert_keys: list[str]):
     share_expert = deepcopy(experts[0])
     expert_num = len(experts)
-    for key in ["w1", "w2", "w3"]:
+    for key in expert_keys:
         weights = []
         for i in range(expert_num):
             weight = getattr(experts[i], key).weight.data.clone()
@@ -73,8 +84,7 @@ def average_merge(experts: nn.ModuleList):
 
 
 def TaskVectorAdaptation(
-    task: GeneralizedTaskArithmeticMerge,
-    experts: nn.ModuleList,
+    task: GeneralizedTaskArithmeticMerge, experts: nn.ModuleList, expert_keys:list[str]
 ):
     share_expert = deepcopy(experts[0])
     params = {p.name: p.default_value for p in task.parameters()}
@@ -84,7 +94,7 @@ def TaskVectorAdaptation(
     }
     if task.sparsification_method == SparsificationMethod.magnitude_outliers:
         tensor_params = {k: v | {"gamma": 0.01} for k, v in tensor_params.items()}
-    for key in ["w1", "w2", "w3"]:
+    for key in expert_keys:
         tensors = {
             i: getattr(experts[i], key).weight.data.clone() for i in range(len(experts))
         }

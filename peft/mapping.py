@@ -50,7 +50,7 @@ PEFT_TYPE_TO_CONFIG_MAPPING = {
     "LORA": LoraConfig,
     "ADALORA": AdaLoraConfig,
     "MMOELORAS": MMOELoraConfigS,
-    "EVELORA": EVEConfig,
+    "EVE": EVEConfig,
 }
 
 

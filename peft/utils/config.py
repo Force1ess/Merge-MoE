@@ -32,7 +32,7 @@ class PeftType(str, enum.Enum):
     ADALORA = "ADALORA"
     ADAPTION_PROMPT = "ADAPTION_PROMPT"
     MMOELORAS = "MMOELORAS"
-    EVELORA = "EVELORA"
+    EVE= "EVE"
 
 
 class TaskType(str, enum.Enum):
