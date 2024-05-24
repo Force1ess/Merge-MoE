@@ -42,6 +42,7 @@ class KDTrainer(Trainer):
         args: TrainingArguments,
         data_collator: DataCollatorForLanguageModeling,
         train_dataset: Optional[Dataset],
+        loss_normalize: bool = True,
         eval_dataset: Optional[Union[Dataset, Dict[str, Dataset]]] = None,
         tokenizer: Optional["PreTrainedTokenizerBase"] = None,
         model_init: Optional[Callable[[], "PreTrainedModel"]] = None,
@@ -79,6 +80,18 @@ class KDTrainer(Trainer):
             if isinstance(i, DEFAULT_PROGRESS_CALLBACK):
                 self.pbar_handler = i
                 break
+        # normalize the loss weight
+        if loss_normalize:
+            loss_weights = [
+                self.d_config.hard_label_weight,
+                self.d_config.kd_loss_weight,
+                self.d_config.intermediate_loss_weight,
+            ]
+            (
+                self.d_config.hard_label_weight,
+                self.d_config.kd_loss_weight,
+                self.d_config.intermediate_loss_weight,
+            ) = [w / sum(loss_weights) for w in loss_weights]
 
     def compute_loss(self, model, inputs, return_outputs=False):
         """
