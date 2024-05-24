@@ -64,8 +64,8 @@ def svd_decomposition(experts, eve_experts, lora_args: dict, expert_keys:list[st
             lora = getattr(eve_experts[i], eve_keys[key_id])
             assert lora.lora_A.weight.shape == A.shape
             assert lora.lora_B.weight.shape == B.shape
-            lora.lora_A.weight.data = A
-            lora.lora_B.weight.data = B
+            lora.lora_A.weight.data = A.contiguous()
+            lora.lora_B.weight.data = B.contiguous()
 
 
 def average_merge(experts: nn.ModuleList, expert_keys: list[str]):
