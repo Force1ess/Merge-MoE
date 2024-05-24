@@ -11,7 +11,7 @@ torchrun --master_port $random_port --nproc_per_node $CUDA_DEVICES_COUNT main.py
     --per_device_train_batch_size 8\
     --distill_config $1\
     --split "train" \
-    --gradient_accumulation_steps 16\
+    --gradient_accumulation_steps 8\
     --warmup_ratio 0.03 \
     --weight_decay 0.01 \
     --lr_scheduler_type "cosine" \

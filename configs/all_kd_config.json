@@ -1,7 +1,7 @@
 {
     "temperature": 2,
     "temperature_scheduler": "none",
-    "hard_label_weight": 1,
+    "hard_label_weight": 0.2,
     "hard_label_weight_scheduler": "none",
     "kd_loss_type": "ce",
     "kd_loss_weight_scheduler": "none",

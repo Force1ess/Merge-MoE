@@ -1,3 +1,4 @@
+import os
 from typing import Callable, Dict, List, Optional, Tuple, Union
 from transformers.trainer import (
     PreTrainedModel,
@@ -92,6 +93,8 @@ class KDTrainer(Trainer):
                 self.d_config.kd_loss_weight,
                 self.d_config.intermediate_loss_weight,
             ) = [w / sum(loss_weights) for w in loss_weights]
+        if os.environ.get("LOCAL_RANK", "0") == "0":
+            print(f"label loss weight: {self.d_config.hard_label_weight}, logits_loss_weight: {self.d_config.kd_loss_weight}, inter loss weight: {self.d_config.intermediate_loss_weight}" )
 
     def compute_loss(self, model, inputs, return_outputs=False):
         """
