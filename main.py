@@ -68,7 +68,7 @@ def main():
             torch_dtype=torch.bfloat16,
         )
     else:
-        config.num_hidden_layers = 2
+        config.num_hidden_layers = 1
         model = AutoModelForCausalLM.from_config(config)
 
     if data_args.split == "train":

@@ -25,6 +25,15 @@ from utils import rank0_print
 import torch
 
 
+def get_sparse_hidden_states(layer):
+    assert hasattr(layer, "sparse_hidden_states")
+    sparse_hids = layer.sparse_hidden_states
+    if isinstance(sparse_hids, tuple):
+        return sparse_hids[0].detach()
+    else:
+        return sparse_hids.detach()
+
+
 class KDTrainer(Trainer):
     def __init__(
         self,
@@ -120,8 +129,7 @@ class KDTrainer(Trainer):
         if self.args.parallel_mode == ParallelMode.DISTRIBUTED:
             results_T = {
                 "hidden_states": [
-                    l.sparse_hidden_states.detach()
-                    for l in model.module.model.model.layers
+                    get_sparse_hidden_states(l) for l in model.module.model.model.layers
                 ]
             }
             results_T["hidden_states"].append(
@@ -133,7 +141,7 @@ class KDTrainer(Trainer):
         else:
             results_T = {
                 "hidden_states": [
-                    l.sparse_hidden_states.detach() for l in model.model.model.layers
+                    get_sparse_hidden_states(l) for l in model.model.model.layers
                 ]
             }
             results_T["hidden_states"].append(

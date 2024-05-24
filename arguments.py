@@ -5,11 +5,12 @@ from transformers import TrainingArguments
 import os
 
 
+# default setting follow dora-llama7b
 @dataclass
 class TraningArguments(TrainingArguments):
     model_name_or_path: Optional[str] = field(default="./Qwen1.5-MoE-A2.7B/")
     model_max_length: int = field(
-        default=4096,
+        default=1024,
         metadata={
             "help": "Maximum sequence length. Sequences will be right padded (and possibly truncated)."
         },
@@ -52,7 +53,7 @@ class TraningArguments(TrainingArguments):
         metadata={"help": "Total number of training epochs to perform."},
     )
     learning_rate: float = field(
-        default=1e-6,
+        default=2e-4,
         metadata={"help": "The initial learning rate for Adam."},
     )
 
@@ -84,7 +85,7 @@ class DistillArguments:
         metadata={"help": "The path to the distillation config file."},
     )
     lora_r: int = field(default=32, metadata={"help": "Lora R dimension."})
-    lora_alpha: float = field(default=16, metadata={"help": " Lora alpha."})
+    lora_alpha: float = field(default=64, metadata={"help": " Lora alpha."})
     lora_dropout: float = field(default=0.0, metadata={"help": "Lora dropout."})
     expert_merge: str = field(
         default="keep1", metadata={"help": "Merge method for MoE."}

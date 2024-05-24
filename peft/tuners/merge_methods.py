@@ -20,11 +20,7 @@ def init_experts(
 
     init_func = INIT_MAP.get(expert_init, None)
     if init_func is not None:
-        expert = getattr(eve_experts[0], expert_keys[0])
-        prev_shape = (expert.lora_A.weight.shape, expert.lora_B.weight.shape)
         init_func(experts, eve_experts, lora_args, expert_keys)
-        after_shape = (expert.lora_A.weight.shape, expert.lora_B.weight.shape)
-        assert prev_shape == after_shape, "The expert initialization failed: unmatched shapes"
 
     if expert_merge is None:
         return
@@ -66,6 +62,8 @@ def svd_decomposition(experts, eve_experts, lora_args: dict, expert_keys:list[st
             A = Vh[:lora_rank, :]
             B = U[:, :lora_rank] @ torch.diag(S[:lora_rank])
             lora = getattr(eve_experts[i], eve_keys[key_id])
+            assert lora.lora_A.weight.shape == A.shape
+            assert lora.lora_B.weight.shape == B.shape
             lora.lora_A.weight.data = A
             lora.lora_B.weight.data = B
 
@@ -146,8 +144,3 @@ MERGE_MAP = {
 INIT_MAP = {
     "svd": svd_decomposition,
 }
-
-if __name__ == "__main__":
-    experts = nn.ModuleList(nn.Linear(10, 10) for _ in range(2))
-    for i in MERGE_MAP.keys():
-        merge_method: GeneralizedTaskArithmeticMerge = MERGE_MAP.get(i)

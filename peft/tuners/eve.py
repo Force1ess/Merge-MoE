@@ -55,7 +55,6 @@ class EVEConfig(PeftConfig):
     inference_mode: bool = field(
         default=False, metadata={"help": "Whether to use inference mode"}
     )
-    use_dora: bool = field(default=False, metadata={"help": "Whether to use DoRA"})
 
     def __post_init__(self):
         self.peft_type = PeftType.EVE
@@ -106,7 +105,6 @@ class EVEModel(LoraModel):
             "lora_alpha": eve_config.lora_alpha,
             "lora_dropout": eve_config.lora_dropout,
             "init_lora_weights": eve_config.init_lora_weights,
-            "use_dora": eve_config.use_dora,
         }
         key_list = [key for key, _ in self.model.named_modules()]
         for key in key_list:
@@ -175,7 +173,7 @@ class EVEModel(LoraModel):
                         experts,
                         eve_experts,
                         eve_args,
-                        ["gate_proj", "up_proj", "down_proj"],
+                        ["gate_proj", "down_proj", "up_proj"],
                         eve_config.expert_init,
                         None,
                     )

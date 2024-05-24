@@ -10,9 +10,6 @@ with read_base():
         BoolQ_datasets,
     )
     from .configs.datasets.obqa.obqa_ppl_6aac9e import obqa_datasets
-    from .configs.datasets.subjective.multiround.mtbench_pair_judge import (
-        MTBenchDataset,
-    )
     from .configs.summarizers.example import summarizer
 
     # from .configs.datasets.winogrande.winogrande_ll_c5cf57 import winogrande_datasets

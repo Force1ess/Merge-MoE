@@ -45,13 +45,11 @@ class EVELinear(nn.Module):
         dtype,
         device,
         r: int = 0,
-        use_dora: bool = False,
         lora_alpha: int = 1,
         lora_dropout: float = 0.0,
         init_lora_weights: bool = True,
     ):
         nn.Module.__init__(self)
-        self.use_dora = use_dora
         self.in_features = in_features
         self.out_features = out_features
         self.dtype = dtype
@@ -66,30 +64,10 @@ class EVELinear(nn.Module):
             result = (self.lora_B(self.lora_A(self.lora_dropout(x))) * self.scaling).to(
                 previous_dtype
             )  # TODO scaling?
-            if self.use_dora:
-                result += self._apply_dora(x, self.lora_A, self.lora_B, self.scaling)
             return result
 
         else:
             raise NotImplementedError("EVELinear does not support such operation.")
-
-    def dora_init(self) -> None:
-        lora_A = self.lora_A.weight
-        lora_B = self.lora_B.weight
-        scaling = self.scaling
-        # TODO base_layer?
-        base_layer = self.get_base_layer()
-        weight = dequantize_module_weight(base_layer)
-        if weight.data.ndim == 4:  # For handling LoRAs applied to Conv2Ds.
-            raise NotImplementedError(
-                "DORA is not supported for Conv2D layers. Please set `use_dora` to False."
-            )
-        else:
-            lora_weight = lora_B @ lora_A
-        # TODO DORA 施工中
-        weight_norm = self._get_weight_norm(weight, lora_weight, scaling)
-
-        self.lora_magnitude_vector = nn.Parameter(weight_norm, requires_grad=True)
 
     def _get_weight_norm(self, weight, lora_weight, scaling) -> torch.Tensor:
         # calculate L2 norm of weight matrix, channel-wise
@@ -98,40 +76,6 @@ class EVELinear(nn.Module):
         weight_norm = weight.norm(p=2, dim=(1, 2, 3), keepdim=True).transpose(1, 0)
         return weight_norm
 
-    def _apply_dora(self, x, lora_A, lora_B, scaling):
-        """
-        For DoRA, calculate the extra output from LoRA with DoRA applied. This should be added on top of the base layer
-        output.
-        """
-        lora_weight = lora_B.weight @ lora_A.weight
-        magnitude = self.lora_magnitude_vector
-        base_layer = self.get_base_layer()
-        weight = dequantize_module_weight(base_layer)
-        weight = weight.to(x.dtype)
-        weight_norm = self._get_weight_norm(weight, lora_weight, scaling)
-        # see section 4.3 of DoRA (https://arxiv.org/abs/2402.09353)
-        # "[...] we suggest treating ||V +∆V ||_c in
-        # Eq. (5) as a constant, thereby detaching it from the gradient
-        # graph. This means that while ||V + ∆V ||_c dynamically
-        # reflects the updates of ∆V , it won’t receive any gradient
-        # during backpropagation"
-        weight_norm = weight_norm.detach()
-        mag_norm_scale = (magnitude / weight_norm).view(1, -1)
-        result_dora = (mag_norm_scale - 1) * (
-            F.linear(x, transpose(weight, self.fan_in_fan_out))
-        ) + mag_norm_scale * lora_B(lora_A(x)) * scaling
-
-        # Note: Computation could potentially be accelerated by using the code below instead of calculating X@W again.
-        # This is only correct if dropout=0, otherwise results will differ:
-        # https://github.com/huggingface/peft/pull/1474#issuecomment-1964682771
-        # bias = self.get_base_layer().bias
-        # if bias is not None:
-        #     result = result - bias
-        # result = mag_norm_scale * result + mag_norm_scale * lora_B(lora_A(x)) * scaling
-        # if bias is not None:
-        #     result = result + bias
-
-        return result_dora
 
     def update_layer(self, r, lora_alpha, lora_dropout, init_lora_weights):
         self.r = r
@@ -160,8 +104,6 @@ class EVELinear(nn.Module):
         if init_lora_weights:
             self.reset_lora_parameters()
         self.to(self.device)
-        if self.use_dora:
-            self.dora_init()
 
     def reset_lora_parameters(self):
         # initialize A the same way as the default for nn.Linear and B to zero
