@@ -8,7 +8,7 @@ import os
 # default setting follow dora-llama7b
 @dataclass
 class TraningArguments(TrainingArguments):
-    model_name_or_path: Optional[str] = field(default="./Qwen1.5-MoE-A2.7B/")
+    model_name_or_path: Optional[str] = field(default="./smol_llama-4x220M-MoE")
     model_max_length: int = field(
         default=1024,
         metadata={
