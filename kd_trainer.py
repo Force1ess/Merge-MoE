@@ -107,37 +107,36 @@ class KDTrainer(Trainer):
         total_loss = 0
 
         # Below is copied from transformers.Trainer.compute_loss() in transformer@2f12e40
-        if self.d_config.hard_label_weight > 0:
-            if self.label_smoother is not None and "labels" in inputs:
-                labels = inputs.pop("labels")
-            else:
-                labels = None
-            outputs = model(**inputs, output_hidden_states=True)
-            # Save past state if it exists
-            # TODO: this needs to be fixed and made cleaner later.
-            if self.args.past_index >= 0:
-                self._past = outputs[self.args.past_index]
+        if self.label_smoother is not None and "labels" in inputs:
+            labels = inputs.pop("labels")
+        else:
+            labels = None
+        outputs = model(**inputs, output_hidden_states=True)
+        # Save past state if it exists
+        # TODO: this needs to be fixed and made cleaner later.
+        if self.args.past_index >= 0:
+            self._past = outputs[self.args.past_index]
 
-            if labels is not None:
-                unwrapped_model = self.accelerator.unwrap_model(model)
-                if _is_peft_model(unwrapped_model):
-                    model_name = unwrapped_model.base_model.model._get_name()
-                else:
-                    model_name = unwrapped_model._get_name()
-                if model_name in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES.values():
-                    # 只有causal lm才需要shift label
-                    loss = self.label_smoother(outputs, labels, shift_labels=True)
-                else:
-                    loss = self.label_smoother(outputs, labels)
+        if labels is not None:
+            unwrapped_model = self.accelerator.unwrap_model(model)
+            if _is_peft_model(unwrapped_model):
+                model_name = unwrapped_model.base_model.model._get_name()
             else:
-                if isinstance(outputs, dict) and "loss" not in outputs:
-                    raise ValueError(
-                        "The model did not return a loss from the inputs, only the following keys: "
-                        f"{','.join(outputs.keys())}. For reference, the inputs it received are {','.join(inputs.keys())}."
-                    )
-                # We don't use .loss here since the model may return tuples instead of ModelOutput.
-                loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
-                total_loss += loss * self.d_config.hard_label_weight
+                model_name = unwrapped_model._get_name()
+            if model_name in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES.values():
+                # 只有causal lm才需要shift label
+                loss = self.label_smoother(outputs, labels, shift_labels=True)
+            else:
+                loss = self.label_smoother(outputs, labels)
+        else:
+            if isinstance(outputs, dict) and "loss" not in outputs:
+                raise ValueError(
+                    "The model did not return a loss from the inputs, only the following keys: "
+                    f"{','.join(outputs.keys())}. For reference, the inputs it received are {','.join(inputs.keys())}."
+                )
+            # We don't use .loss here since the model may return tuples instead of ModelOutput.
+            loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
+            total_loss += loss * self.d_config.hard_label_weight
 
         results_S = outputs
         # KD loss copied from textbrewer general distiller without custom match and loss dict
