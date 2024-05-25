@@ -81,13 +81,14 @@ def main():
         eve_config,
     )
     eve_model.print_trainable_parameters()
+    while training_args.per_device_train_batch_size*torch.cuda.device_count()*training_args.gradient_accumulation_steps<64:
+        training_args.gradient_accumulation_steps*=2
 
     training_args.output_dir = os.path.join(
         training_args.output_dir,
-        f"{training_args.model_name_or_path}-bs{training_args.per_device_train_batch_size*torch.cuda.device_count()*training_args.gradient_accumulation_steps}-{Path(distill_args.distill_config).stem}".replace(
+        datetime.now().strftime("%m-%d-%H-%M-%S")+f"{training_args.model_name_or_path}-{Path(distill_args.distill_config).stem}".replace(
             "/", "-"
         )
-        + datetime.now().strftime("%m-%d-%H-%M-%S"),
     )
     dir_check(training_args.output_dir)
     distill_config: dict = json.load(open(distill_args.distill_config, "r"))

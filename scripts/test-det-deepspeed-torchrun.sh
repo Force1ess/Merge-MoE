@@ -15,5 +15,4 @@ torchrun --master_port $random_port --nproc_per_node $CUDA_DEVICES_COUNT main.py
     --tf32 True \
     --attn_implementation "flash_attention_2" 
     #--deepspeed $2
-    #--gradient_accumulation_steps 1 \
     #--bf16 True \
