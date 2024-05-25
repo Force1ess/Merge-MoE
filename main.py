@@ -19,7 +19,7 @@ from transformers import (
 )
 from pathlib import Path
 from datasets import load_dataset, load_from_disk
-from utils import send_feishu, dir_check
+from utils import rank0_print, send_feishu, dir_check
 from datetime import datetime
 
 
@@ -118,8 +118,8 @@ def main():
         dataset,
         tokenizer=tokenizer,
     )
-    if os.environ.get("LOCAL_RANK", "0") == "0" and data_args.split == "train":
-        print(
+    if  data_args.split == "train":
+        rank0_print(
             f"total batch_size: {training_args.per_device_train_batch_size*torch.cuda.device_count()*training_args.gradient_accumulation_steps}"
         )
     trainer.train()

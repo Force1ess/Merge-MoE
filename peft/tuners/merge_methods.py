@@ -24,10 +24,10 @@ def init_experts(
 
     if expert_merge is None:
         return
-    merge_func = MERGE_MAP.get(expert_merge, expert_keys)
+    merge_func = MERGE_MAP.get(expert_merge,)
     if isinstance(merge_func, GeneralizedTaskArithmeticMerge):
-        merge_func = partial(TaskVectorAdaptation, task=merge_func)
-    return merge_func(experts)
+        merge_func = partial(TaskVectorAdaptation, merge_func)
+    return merge_func(experts, expert_keys)
 
 
 def keep_one(experts: nn.ModuleList, *args, **kwargs):

@@ -53,7 +53,7 @@ class TraningArguments(TrainingArguments):
         metadata={"help": "Total number of training epochs to perform."},
     )
     learning_rate: float = field(
-        default=1e-6,
+        default=2e-4,
         metadata={"help": "The initial learning rate for Adam."},
     )
 
@@ -65,7 +65,7 @@ class DataArguments:
         metadata={"help": "The name of the dataset to use (via the datasets library)."},
     )
     split: Optional[str] = field(
-        default="validation[:128]",
+        default="validation[:1024]",
         metadata={
             "help": "The name of the training data set split to use (via the datasets library)."
         },

@@ -1,4 +1,4 @@
-import os
+import math
 from typing import Callable, Dict, List, Optional, Tuple, Union
 from transformers.trainer import (
     PreTrainedModel,
@@ -82,19 +82,28 @@ class KDTrainer(Trainer):
                 self.pbar_handler = i
                 break
         # normalize the loss weight
-        if loss_normalize:
-            loss_weights = [
-                self.d_config.hard_label_weight,
-                self.d_config.kd_loss_weight,
-                self.d_config.intermediate_loss_weight,
-            ]
-            (
-                self.d_config.hard_label_weight,
-                self.d_config.kd_loss_weight,
-                self.d_config.intermediate_loss_weight,
-            ) = [w / sum(loss_weights) for w in loss_weights]
-        if os.environ.get("LOCAL_RANK", "0") == "0":
-            print(f"label loss weight: {self.d_config.hard_label_weight}, logits_loss_weight: {self.d_config.kd_loss_weight}, inter loss weight: {self.d_config.intermediate_loss_weight}" )
+        self.loss_normalize = loss_normalize
+        self.total_steps = (
+            args.num_train_epochs
+            * len(train_dataset)
+            // (
+                args.per_device_train_batch_size
+                * args.gradient_accumulation_steps
+                * args.world_size
+                * torch.cuda.device_count()
+            )
+        )
+
+    def schedule_step(self, step):
+        rad = math.pi / 2 * (step / self.total_steps)
+        weights = (
+            self.d_config.hard_label_weight * math.cos(rad),
+            self.d_config.kd_loss_weight * math.sin(rad),
+            self.d_config.intermediate_loss_weight * math.sin(rad),
+        )
+        if self.loss_normalize:
+            weights = [w / sum(weights) for w in weights]
+        return weights
 
     def compute_loss(self, model, inputs, return_outputs=False):
         """
@@ -103,9 +112,11 @@ class KDTrainer(Trainer):
         Subclass and override for custom behavior.
         """
 
-        self.step += 1
         total_loss = 0
-
+        hard_label_weight, kd_loss_weight, intermediate_loss_weight = (
+            self.schedule_step(self.step)
+        )
+        self.step += 1
         # Below is copied from transformers.Trainer.compute_loss() in transformer@2f12e40
         if self.label_smoother is not None and "labels" in inputs:
             labels = inputs.pop("labels")
@@ -136,7 +147,7 @@ class KDTrainer(Trainer):
                 )
             # We don't use .loss here since the model may return tuples instead of ModelOutput.
             loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
-            total_loss += loss * self.d_config.hard_label_weight
+            total_loss += loss * hard_label_weight
 
         results_S = outputs
         # KD loss copied from textbrewer general distiller without custom match and loss dict
@@ -173,7 +184,7 @@ class KDTrainer(Trainer):
                 temperature = self.d_config.temperature
                 total_kd_loss += self.kd_loss(l_S, l_T, temperature)
 
-        total_loss += total_kd_loss * self.d_config.kd_loss_weight
+        total_loss += total_kd_loss * kd_loss_weight
         inters_T = {feature: results_T.get(feature, []) for feature in FEATURES}
         inters_S = {feature: results_S.get(feature, []) for feature in FEATURES}
         total_inter_loss = 0
@@ -193,7 +204,7 @@ class KDTrainer(Trainer):
                 inter_T = inters_T[feature][layer_T]
             intermediate_loss = match_loss(inter_S, inter_T, mask=None)
             total_inter_loss += intermediate_loss * match_weight
-        total_loss += total_inter_loss * self.d_config.intermediate_loss_weight
+        total_loss += total_inter_loss * intermediate_loss_weight
         if (
             self.step % (self.logging_steps * self.args.gradient_accumulation_steps)
             == 0
