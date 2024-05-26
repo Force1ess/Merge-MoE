@@ -161,7 +161,8 @@ class KDTrainer(Trainer):
             results_T["hidden_states"].append(
                 model.module.model.model.norm(results_T["hidden_states"][-1])
             )
-            results_T["logits"] = model.module.lm_head(
+            if kd_loss_weight != 0:
+                results_T["logits"] = model.module.lm_head(
                 results_T["hidden_states"][-1]
             ).float()
         else:
@@ -173,48 +174,51 @@ class KDTrainer(Trainer):
             results_T["hidden_states"].append(
                 model.model.model.norm(results_T["hidden_states"][-1])
             )
-            results_T["logits"] = model.lm_head(results_T["hidden_states"][-1]).float()
+            if kd_loss_weight != 0:
+                results_T["logits"] = model.lm_head(results_T["hidden_states"][-1]).float()
 
-        for l_T, l_S in zip(results_T["logits"], results_S.logits):
-            if self.d_config.temperature_scheduler is not None:
-                temperature = self.d_config.temperature_scheduler(
-                    l_S, l_T, self.d_config.temperature
+        if kd_loss_weight != 0:
+            for l_T, l_S in zip(results_T["logits"], results_S.logits):
+                if self.d_config.temperature_scheduler is not None:
+                    temperature = self.d_config.temperature_scheduler(
+                        l_S, l_T, self.d_config.temperature
+                    )
+                else:
+                    temperature = self.d_config.temperature
+                    total_kd_loss += self.kd_loss(l_S, l_T, temperature)
+
+            total_loss += total_kd_loss * kd_loss_weight
+        if intermediate_loss_weight != 0:
+            inters_T = {feature: results_T.get(feature, []) for feature in FEATURES}
+            inters_S = {feature: results_S.get(feature, []) for feature in FEATURES}
+            total_inter_loss = 0
+            for ith, inter_match in enumerate(self.d_config.intermediate_matches):
+                layer_T = inter_match.layer_T
+                layer_S = inter_match.layer_S
+                feature = inter_match.feature
+                loss_type = inter_match.loss
+                match_weight = inter_match.weight
+                match_loss = MATCH_LOSS_MAP[loss_type]
+
+                if type(layer_S) is list and type(layer_T) is list:
+                    inter_S = [inters_S[feature][s] for s in layer_S]
+                    inter_T = [inters_T[feature][t] for t in layer_T]
+                else:
+                    inter_S = inters_S[feature][layer_S]
+                    inter_T = inters_T[feature][layer_T]
+                intermediate_loss = match_loss(inter_S, inter_T, mask=None)
+                total_inter_loss += intermediate_loss * match_weight
+            total_loss += total_inter_loss * intermediate_loss_weight
+            if (
+                self.step % (self.logging_steps * self.args.gradient_accumulation_steps)
+                == 0
+                and self.pbar_handler is not None
+                and self.pbar_handler.training_bar is not None
+            ):
+                self.pbar_handler.training_bar.write(
+                    f"step {self.step}: [0]label loss {loss * hard_label_weight} [1]logits loss {total_kd_loss * kd_loss_weight} [2]inter loss {total_inter_loss * intermediate_loss_weight}"
                 )
-            else:
-                temperature = self.d_config.temperature
-                total_kd_loss += self.kd_loss(l_S, l_T, temperature)
-
-        total_loss += total_kd_loss * kd_loss_weight
-        inters_T = {feature: results_T.get(feature, []) for feature in FEATURES}
-        inters_S = {feature: results_S.get(feature, []) for feature in FEATURES}
-        total_inter_loss = 0
-        for ith, inter_match in enumerate(self.d_config.intermediate_matches):
-            layer_T = inter_match.layer_T
-            layer_S = inter_match.layer_S
-            feature = inter_match.feature
-            loss_type = inter_match.loss
-            match_weight = inter_match.weight
-            match_loss = MATCH_LOSS_MAP[loss_type]
-
-            if type(layer_S) is list and type(layer_T) is list:
-                inter_S = [inters_S[feature][s] for s in layer_S]
-                inter_T = [inters_T[feature][t] for t in layer_T]
-            else:
-                inter_S = inters_S[feature][layer_S]
-                inter_T = inters_T[feature][layer_T]
-            intermediate_loss = match_loss(inter_S, inter_T, mask=None)
-            total_inter_loss += intermediate_loss * match_weight
-        total_loss += total_inter_loss * intermediate_loss_weight
-        if (
-            self.step % (self.logging_steps * self.args.gradient_accumulation_steps)
-            == 0
-            and self.pbar_handler is not None
-            and self.pbar_handler.training_bar is not None
-        ):
-            self.pbar_handler.training_bar.write(
-                f"step {self.step}: [0]label loss {loss * hard_label_weight} [1]logits loss {total_kd_loss * kd_loss_weight} [2]inter loss {total_inter_loss * intermediate_loss_weight}"
-            )
-            self.pbar_handler.training_bar.write(
-                f"weight: [0]label {hard_label_weight} [1]logits {kd_loss_weight} [2]inter {intermediate_loss_weight}"
-            )
+                self.pbar_handler.training_bar.write(
+                    f"weight: [0]label {hard_label_weight} [1]logits {kd_loss_weight} [2]inter {intermediate_loss_weight}"
+                )
         return (total_loss, outputs) if return_outputs else total_loss
