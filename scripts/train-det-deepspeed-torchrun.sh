@@ -9,7 +9,7 @@ while true; do
 done
 torchrun --master_port $random_port --nproc_per_node $CUDA_DEVICES_COUNT main.py \
     --split "train[:4096]"\
-    --data_workers 2\
+    --data_workers 8\
     --per_device_train_batch_size 16\
     --distill_config $1\
     --bf16 True \
