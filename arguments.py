@@ -41,7 +41,7 @@ class TraningArguments(TrainingArguments):
         metadata={"help": "Whether to save safetensors."},
     )
     logging_steps: int = field(
-        default=5,
+        default=10,
         metadata={"help": "Log every X updates steps."},
     )
     save_steps: int = field(

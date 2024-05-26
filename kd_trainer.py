@@ -212,6 +212,9 @@ class KDTrainer(Trainer):
             and self.pbar_handler.training_bar is not None
         ):
             self.pbar_handler.training_bar.write(
-                f"step {self.step}: [0]label Loss {loss * self.d_config.hard_label_weight} [1]logits loss {total_kd_loss * self.d_config.kd_loss_weight} [2]inter loss {total_inter_loss * self.d_config.intermediate_loss_weight}"
+                f"step {self.step}: [0]label loss {loss * hard_label_weight} [1]logits loss {total_kd_loss * kd_loss_weight} [2]inter loss {total_inter_loss * intermediate_loss_weight}"
+            )
+            self.pbar_handler.training_bar.write(
+                f"weight: [0]label {hard_label_weight} [1]logits {kd_loss_weight} [2]inter {intermediate_loss_weight}"
             )
         return (total_loss, outputs) if return_outputs else total_loss
