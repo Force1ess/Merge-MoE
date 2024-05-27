@@ -39,8 +39,8 @@ class KDTrainer(Trainer):
     def __init__(
         self,
         model: Union[PreTrainedModel, nn.Module],
-        distill_config: DistillationConfig,
         args: TrainingArguments,
+        distill_config: DistillationConfig,
         data_collator: DataCollatorForLanguageModeling,
         train_dataset: Optional[Dataset],
         loss_normalize: bool = True,
@@ -94,16 +94,6 @@ class KDTrainer(Trainer):
             )
         )
 
-    def schedule_step(self, step):
-        rad = math.pi / 2 * (step / self.total_steps)
-        weights = (
-            self.d_config.hard_label_weight * math.cos(rad),
-            self.d_config.kd_loss_weight * math.sin(rad),
-            self.d_config.intermediate_loss_weight * math.sin(rad),
-        )
-        if self.loss_normalize:
-            weights = [w / sum(weights) for w in weights]
-        return weights
 
     def compute_loss(self, model, inputs, return_outputs=False):
         """
@@ -114,7 +104,9 @@ class KDTrainer(Trainer):
 
         total_loss = 0
         hard_label_weight, kd_loss_weight, intermediate_loss_weight = (
-            self.schedule_step(self.step)
+            self.d_config.hard_label_weight,
+            self.d_config.kd_loss_weight,
+            self.d_config.intermediate_loss_weight,
         )
         self.step += 1
         # Below is copied from transformers.Trainer.compute_loss() in transformer@2f12e40

@@ -11,9 +11,6 @@ torchrun --master_port $random_port --nproc_per_node $CUDA_DEVICES_COUNT main.py
     --per_device_train_batch_size 8\
     --distill_config $1\
     --split "train" \
-    --warmup_ratio 0.03 \
-    --weight_decay 0.01 \
-    --lr_scheduler_type "cosine" \
     --bf16 True \
     --tf32 True\
     --attn_implementation "flash_attention_2" \

@@ -40,6 +40,18 @@ class TraningArguments(TrainingArguments):
         default=False,
         metadata={"help": "Whether to save safetensors."},
     )
+    weight_decay: float = field(
+        default=0.1,
+        metadata={"help": "Weight decay for optimizer."},
+    )
+    lr_scheduler_type: str = field(
+        default="cosine",
+        metadata={"help": "The scheduler type to use."},
+    )
+    warmup_ratio: float = field(
+        default=0.03,
+        metadata={"help": "Linear warmup ratio."},
+    )
     logging_steps: int = field(
         default=10,
         metadata={"help": "Log every X updates steps."},
@@ -78,6 +90,7 @@ class DataArguments:
     )
 
 
+# text brewer setting lambda = 0.9 and router aux loss weight - 0.01
 @dataclass
 class DistillArguments:
     distill_config: str = field(

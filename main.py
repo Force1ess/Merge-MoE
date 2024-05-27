@@ -88,7 +88,7 @@ def main():
         training_args.output_dir,
         datetime.now().strftime("%m-%d-%H-%M-%S")+f"{training_args.model_name_or_path}-{Path(distill_args.distill_config).stem}".replace(
             "/", "-"
-        )
+        )+distill_args.expert_merge+'-'+distill_args.expert_init
     )
     dir_check(training_args.output_dir)
     distill_config: dict = json.load(open(distill_args.distill_config, "r"))
@@ -112,8 +112,8 @@ def main():
 
     trainer = KDTrainer(
         eve_model,
-        distill_config,
         training_args,
+        distill_config,
         data_collator,
         dataset,
         tokenizer=tokenizer,
