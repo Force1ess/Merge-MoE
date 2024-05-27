@@ -3,15 +3,22 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import torch
 from transformers import DataCollatorForLanguageModeling
-from transformers.trainer import (DEFAULT_PROGRESS_CALLBACK,
-                                  MODEL_FOR_CAUSAL_LM_MAPPING_NAMES, Dataset,
-                                  EvalPrediction, ParallelMode,
-                                  PreTrainedModel, PreTrainedTokenizerBase,
-                                  Trainer, TrainerCallback, TrainingArguments,
-                                  _is_peft_model, nn)
+from transformers.trainer import (
+    DEFAULT_PROGRESS_CALLBACK,
+    MODEL_FOR_CAUSAL_LM_MAPPING_NAMES,
+    Dataset,
+    EvalPrediction,
+    ParallelMode,
+    PreTrainedModel,
+    PreTrainedTokenizerBase,
+    Trainer,
+    TrainerCallback,
+    TrainingArguments,
+    _is_peft_model,
+    nn,
+)
 
-from textbrewer import (FEATURES, KD_LOSS_MAP, MATCH_LOSS_MAP,
-                        DistillationConfig)
+from textbrewer import FEATURES, KD_LOSS_MAP, MATCH_LOSS_MAP, DistillationConfig
 from utils import rank0_print
 
 
@@ -191,13 +198,13 @@ class KDTrainer(Trainer):
                 intermediate_loss = match_loss(inter_S, inter_T, mask=None)
                 total_inter_loss += intermediate_loss * match_weight
             total_loss += total_inter_loss * intermediate_loss_weight
-            if (
-                self.step % (self.logging_steps * self.args.gradient_accumulation_steps)
-                == 0
-                and self.pbar_handler is not None
-                and self.pbar_handler.training_bar is not None
-            ):
-                self.pbar_handler.training_bar.write(
-                    f"step {self.step}: [0]label loss {loss * hard_label_weight} [1]logits loss {total_kd_loss * kd_loss_weight} [2]inter loss {total_inter_loss *total_inter_loss }"
-                )
+        if (
+            self.step % (self.logging_steps * self.args.gradient_accumulation_steps)
+            == 0
+            and self.pbar_handler is not None
+            and self.pbar_handler.training_bar is not None
+        ):
+            self.pbar_handler.training_bar.write(
+                f"step {self.step}: [0]label loss {loss * hard_label_weight} [1]logits loss {total_kd_loss * kd_loss_weight} [2]inter loss {total_inter_loss * intermediate_loss_weight}"
+            )
         return (total_loss, outputs) if return_outputs else total_loss
