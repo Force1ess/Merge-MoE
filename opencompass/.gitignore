@@ -16,7 +16,6 @@ opencompass/**/*_bkup.py
 data
 work_dirs
 outputs
-models/*
 configs/internal/
 # Byte-compiled / optimized / DLL files
 __pycache__/
