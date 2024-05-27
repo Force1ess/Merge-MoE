@@ -8,10 +8,12 @@ while true; do
     fi
 done
 torchrun --master_port $random_port --nproc_per_node $CUDA_DEVICES_COUNT main.py \
-    --per_device_train_batch_size 8\
+    --per_device_train_batch_size 16\
     --distill_config $1\
     --split "train" \
     --bf16 True \
     --tf32 True\
     --attn_implementation "flash_attention_2" \
-    --deepspeed $2
+    --deepspeed $2\
+    --expert_merge $3\
+    --expert_init $4

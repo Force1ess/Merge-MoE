@@ -1,26 +1,20 @@
 import json
-import socket
 import os
-from kd_trainer import KDTrainer
-from arguments import (
-    TraningArguments,
-    DataArguments,
-    DistillArguments,
-)
-from peft import get_peft_model, EVEConfig, TaskType
-from textbrewer import DistillationConfig
+import socket
+from datetime import datetime
+from pathlib import Path
+
 import torch
 import transformers
-from transformers import (
-    AutoTokenizer,
-    DataCollatorForLanguageModeling,
-    AutoModelForCausalLM,
-    AutoConfig,
-)
-from pathlib import Path
 from datasets import load_dataset, load_from_disk
-from utils import rank0_print, send_feishu, dir_check
-from datetime import datetime
+from transformers import (AutoConfig, AutoModelForCausalLM, AutoTokenizer,
+                          DataCollatorForLanguageModeling)
+
+from arguments import DataArguments, DistillArguments, TraningArguments
+from kd_trainer import KDTrainer
+from peft import EVEConfig, TaskType, get_peft_model
+from textbrewer import DistillationConfig
+from utils import dir_check, rank0_print, send_feishu
 
 
 def main():
@@ -65,7 +59,6 @@ def main():
         model = AutoModelForCausalLM.from_pretrained(
             training_args.model_name_or_path,
             attn_implementation=training_args.attn_implementation,
-            torch_dtype=torch.bfloat16,
         )
     else:
         config.num_hidden_layers = 1
@@ -81,14 +74,23 @@ def main():
         eve_config,
     )
     eve_model.print_trainable_parameters()
-    while training_args.per_device_train_batch_size*torch.cuda.device_count()*training_args.gradient_accumulation_steps<64:
-        training_args.gradient_accumulation_steps*=2
+    while (
+        training_args.per_device_train_batch_size
+        * torch.cuda.device_count()
+        * training_args.gradient_accumulation_steps
+        < 64
+    ):
+        training_args.gradient_accumulation_steps *= 2
 
     training_args.output_dir = os.path.join(
         training_args.output_dir,
-        datetime.now().strftime("%m-%d-%H-%M-%S")+f"{training_args.model_name_or_path}-{Path(distill_args.distill_config).stem}".replace(
+        datetime.now().strftime("%m-%d-%H-%M-%S")
+        + f"{training_args.model_name_or_path}-{Path(distill_args.distill_config).stem}".replace(
             "/", "-"
-        )+distill_args.expert_merge+'-'+distill_args.expert_init
+        )
+        + distill_args.expert_merge
+        + "-"
+        + distill_args.expert_init,
     )
     dir_check(training_args.output_dir)
     distill_config: dict = json.load(open(distill_args.distill_config, "r"))
@@ -118,13 +120,18 @@ def main():
         dataset,
         tokenizer=tokenizer,
     )
-    if  data_args.split == "train":
+    if data_args.split == "train":
         rank0_print(
             f"total batch_size: {training_args.per_device_train_batch_size*torch.cuda.device_count()*training_args.gradient_accumulation_steps}"
         )
+        rank0_print(
+            f"weight: [0]label {distill_config.hard_label_weight} [1]logits {distill_config.kd_loss_weight} [2]inter {distill_config.intermediate_loss_weight}"
+        )
     trainer.train()
     if os.environ.get("LOCAL_RANK", "0") == "0" and data_args.split == "train":
-        send_feishu(f"{socket.gethostname()}: 训练完成，模型保存在{training_args.output_dir}")
+        send_feishu(
+            f"{socket.gethostname()}: 训练完成，模型保存在{training_args.output_dir}"
+        )
 
 
 if __name__ == "__main__":

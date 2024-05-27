@@ -1,29 +1,18 @@
 import math
 from typing import Callable, Dict, List, Optional, Tuple, Union
-from transformers.trainer import (
-    PreTrainedModel,
-    PreTrainedTokenizerBase,
-    TrainerCallback,
-    EvalPrediction,
-    TrainingArguments,
-    nn,
-    Trainer,
-    ParallelMode,
-    Dataset,
-    MODEL_FOR_CAUSAL_LM_MAPPING_NAMES,
-    _is_peft_model,
-    DEFAULT_PROGRESS_CALLBACK,
-)
-from textbrewer import (
-    DistillationConfig,
-    KD_LOSS_MAP,
-    MATCH_LOSS_MAP,
-    FEATURES,
-)
-from transformers import DataCollatorForLanguageModeling
-from utils import rank0_print
 
 import torch
+from transformers import DataCollatorForLanguageModeling
+from transformers.trainer import (DEFAULT_PROGRESS_CALLBACK,
+                                  MODEL_FOR_CAUSAL_LM_MAPPING_NAMES, Dataset,
+                                  EvalPrediction, ParallelMode,
+                                  PreTrainedModel, PreTrainedTokenizerBase,
+                                  Trainer, TrainerCallback, TrainingArguments,
+                                  _is_peft_model, nn)
+
+from textbrewer import (FEATURES, KD_LOSS_MAP, MATCH_LOSS_MAP,
+                        DistillationConfig)
+from utils import rank0_print
 
 
 def get_sparse_hidden_states(layer):
@@ -94,7 +83,6 @@ class KDTrainer(Trainer):
             )
         )
 
-
     def compute_loss(self, model, inputs, return_outputs=False):
         """
         How the loss is computed by Trainer. By default, all models return the loss in the first element.
@@ -155,8 +143,8 @@ class KDTrainer(Trainer):
             )
             if kd_loss_weight != 0:
                 results_T["logits"] = model.module.lm_head(
-                results_T["hidden_states"][-1]
-            ).float()
+                    results_T["hidden_states"][-1]
+                ).float()
         else:
             results_T = {
                 "hidden_states": [
@@ -167,7 +155,9 @@ class KDTrainer(Trainer):
                 model.model.model.norm(results_T["hidden_states"][-1])
             )
             if kd_loss_weight != 0:
-                results_T["logits"] = model.lm_head(results_T["hidden_states"][-1]).float()
+                results_T["logits"] = model.lm_head(
+                    results_T["hidden_states"][-1]
+                ).float()
 
         if kd_loss_weight != 0:
             for l_T, l_S in zip(results_T["logits"], results_S.logits):
@@ -208,9 +198,6 @@ class KDTrainer(Trainer):
                 and self.pbar_handler.training_bar is not None
             ):
                 self.pbar_handler.training_bar.write(
-                    f"step {self.step}: [0]label loss {loss * hard_label_weight} [1]logits loss {total_kd_loss * kd_loss_weight} [2]inter loss {total_inter_loss * intermediate_loss_weight}"
-                )
-                self.pbar_handler.training_bar.write(
-                    f"weight: [0]label {hard_label_weight} [1]logits {kd_loss_weight} [2]inter {intermediate_loss_weight}"
+                    f"step {self.step}: [0]label loss {loss * hard_label_weight} [1]logits loss {total_kd_loss * kd_loss_weight} [2]inter loss {total_inter_loss *total_inter_loss }"
                 )
         return (total_loss, outputs) if return_outputs else total_loss

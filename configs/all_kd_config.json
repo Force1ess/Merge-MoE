@@ -5,8 +5,8 @@
     "hard_label_weight_scheduler": "none",
     "kd_loss_type": "ce",
     "kd_loss_weight_scheduler": "none",
-    "kd_loss_weight":0.05,
-    "intermediate_loss_weight": 0.05,
+    "kd_loss_weight":0.02,
+    "intermediate_loss_weight": 0.005,
     "probability_shift": false,
     "sep_intermediate_layers":1,
     "is_caching_logits": false

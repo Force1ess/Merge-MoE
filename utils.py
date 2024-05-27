@@ -1,12 +1,12 @@
-import torch
-import pandas as pd
+import logging
 import os
 import sys
-import requests
 import time
-import logging
-
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import pandas as pd
+import requests
+import torch
 from tqdm.auto import tqdm
 
 print = tqdm.write

@@ -1,8 +1,9 @@
+import os
 from dataclasses import dataclass, field
 from typing import Optional
+
 import torch
 from transformers import TrainingArguments
-import os
 
 
 # default setting follow dora-llama7b
@@ -104,7 +105,7 @@ class DistillArguments:
         default="keep1", metadata={"help": "Merge method for MoE."}
     )
     expert_init: str = field(
-        default=None, metadata={"help": "Initialization method for MoE."}
+        default="", metadata={"help": "Initialization method for MoE."}
     )
     intermediate_loss: str = field(
         default="hidden_mse",
