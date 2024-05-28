@@ -2,22 +2,15 @@ from mmengine.config import read_base
 
 with read_base():
     from .configs.datasets.mmlu.mmlu_ppl_ac766d import mmlu_datasets
-    from .configs.datasets.triviaqa.triviaqa_wiki_gen_d18bf4 import triviaqa_datasets
+    from .configs.datasets.triviaqa.triviaqa_wiki_1shot_gen_eaf81e import triviaqa_datasets
     from .configs.datasets.gsm8k.gsm8k_gen_3309bd import gsm8k_datasets
     from .configs.datasets.humaneval.humaneval_gen_a82cae import humaneval_datasets
-    from .configs.datasets.agieval.agieval_gen import agieval_datasets
-    from .configs.datasets.SuperGLUE_BoolQ.SuperGLUE_BoolQ_ppl_314797 import (
-        BoolQ_datasets,
-    )
-    from .configs.datasets.obqa.obqa_ppl_6aac9e import obqa_datasets
+    #from .configs.datasets.obqa.obqa_ppl_6aac9e import obqa_datasets
     from .configs.summarizers.example import summarizer
 
-    # from .configs.datasets.winogrande.winogrande_ll_c5cf57 import winogrande_datasets
-    # from .configs.datasets.hellaswag.hellaswag_ppl_a6e128 import hellaswag_datasets
-    # from .configs.datasets.nq.nq_open_gen_e93f8a import nq_datasets
 from opencompass.models import HuggingFaceCausalLM
 
-path = "~/Merge-MoE/smol_llama-4x220M-MoE"
+path = "/root/Merge-MoE/smol_llama-4x220M-MoE"
 models = [
     dict(
         type=HuggingFaceCausalLM,

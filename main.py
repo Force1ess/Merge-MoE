@@ -92,8 +92,11 @@ def main():
         + "-"
         + distill_args.expert_init,
     )
+    rank0_print(f'model saved to -> {training_args.output_dir}')
     dir_check(training_args.output_dir)
     distill_config: dict = json.load(open(distill_args.distill_config, "r"))
+    if distill_config['intermediate_loss_weight']=='layer':
+        distill_config['intermediate_loss_weight']=1/config.num_hidden_layers
     sep_intermediate_layers = distill_config.pop("sep_intermediate_layers", 1)
     distill_config = DistillationConfig.from_dict(
         distill_config
