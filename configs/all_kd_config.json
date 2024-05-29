@@ -6,7 +6,7 @@
     "kd_loss_type": "ce",
     "kd_loss_weight_scheduler": "none",
     "kd_loss_weight": 0.005,
-    "intermediate_loss_weight":"layer",
+    "intermediate_loss_weight":0.1,
     "probability_shift": false,
     "sep_intermediate_layers":1,
     "is_caching_logits": false

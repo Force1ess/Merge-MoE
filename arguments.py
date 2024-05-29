@@ -9,7 +9,7 @@ from transformers import TrainingArguments
 # default setting follow dora-llama7b
 @dataclass
 class TraningArguments(TrainingArguments):
-    model_name_or_path: Optional[str] = field(default="./smol_llama-4x220M-MoE")
+    model_name_or_path: Optional[str] = field(default="./Qwen1.5-MoE-A2.7B")
     model_max_length: int = field(
         default=1024,
         metadata={
@@ -62,7 +62,7 @@ class TraningArguments(TrainingArguments):
         metadata={"help": "Save checkpoint every X updates steps."},
     )
     num_train_epochs: int = field(
-        default=1,
+        default=2,
         metadata={"help": "Total number of training epochs to perform."},
     )
     learning_rate: float = field(

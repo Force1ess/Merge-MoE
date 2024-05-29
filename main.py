@@ -26,6 +26,7 @@ def main():
         training_args.model_name_or_path,
         model_max_length=training_args.model_max_length,
     )
+    tokenizer.padding_side='left'
     data_collator = DataCollatorForLanguageModeling(
         tokenizer=tokenizer,
         mlm=False,
